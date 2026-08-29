@@ -127,23 +127,11 @@ export default function App() {
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const [toastMessage, setToastMessage] = useState('');
 
-  // Expenses State
-  const [expenses, setExpenses] = useState([
-    { id: '1', title: 'Villa Deposit (3 Nights)', amount: 160, paidBy: 'You', category: 'Stay' },
-    { id: '2', title: 'Scooter Rental (Bali)', amount: 45, paidBy: 'Elena', category: 'Transport' },
-    { id: '3', title: 'Jimbaran Seafood Dinner', amount: 80, paidBy: 'You', category: 'Food' }
-  ]);
 
   const [newExpense, setNewExpense] = useState({ title: '', amount: '', paidBy: 'You', category: 'Food' });
 
-  // Itinerary State
-  const [itinerary, setItinerary] = useState([
-    { id: '1', time: '09:00 AM', title: 'Tegenungan Waterfall Hike', cost: 15, votes: 12 },
-    { id: '2', time: '01:00 PM', title: 'Organic Farm Lunch in Ubud', cost: 20, votes: 9 },
-    { id: '3', time: '05:00 PM', title: 'Tegallalang Sunset Swing', cost: 12, votes: 16 }
-  ]);
-
   const [newActivity, setNewActivity] = useState({ time: '10:00 AM', title: '', cost: '' });
+
 
   // Social Feed Posts
   const [posts, setPosts] = useState([
