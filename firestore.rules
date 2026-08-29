@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isMemberOfTrip(tripData) {
+      return isAuthenticated() && (request.auth.uid in tripData.currentMemberIds || request.auth.uid == tripData.hostId);
+    }
+
+    // USERS COLLECTION
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isOwner(userId);
+      allow delete: if false; // Deletions handled by admin function
+    }
+
+    // TRIPS COLLECTION
+    match /trips/{tripId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.hostId == request.auth.uid || request.auth.uid in resource.data.currentMemberIds);
+      allow delete: if isAuthenticated() && resource.data.hostId == request.auth.uid;
+    }
+
+    // MATCHES COLLECTION
+    match /matches/{matchId} {
+      allow read: if isAuthenticated() && (resource.data.userId1 == request.auth.uid || resource.data.userId2 == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.userId1 == request.auth.uid || resource.data.userId2 == request.auth.uid);
+    }
+
+    // CHATS & MESSAGES
+    match /chats/{chatId} {
+      allow read: if isAuthenticated() && request.auth.uid in resource.data.members;
+      allow create: if isAuthenticated();
+      
+      match /messages/{messageId} {
+        allow read, create: if isAuthenticated();
+      }
+    }
+
+    // EXPENSES COLLECTION
+    match /expenses/{tripId}/items/{expenseId} {
+      allow read, create, update, delete: if isAuthenticated();
+    }
+
+    // ITINERARY COLLECTION
+    match /itinerary/{tripId}/days/{dayNumber}/activities/{activityId} {
+      allow read, create, update, delete: if isAuthenticated();
+    }
+
+    // SOCIAL POSTS
+    match /posts/{postId} {
+      allow read: if true; // Public feed
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // SAFETY & SOS LOGS
+    match /sos_alerts/{alertId} {
+      allow create: if isAuthenticated();
+      allow read, update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+  }
+}
