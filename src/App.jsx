@@ -1,239 +1,294 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Sparkles, ShieldAlert, Heart, MapPin, Calendar, DollarSign, 
+  Flame, ShieldAlert, Heart, MapPin, Calendar, DollarSign, 
   Users, CheckCircle2, Search, Filter, UserCheck, MessageSquare, 
-  Plus, ThumbsUp, Send, Bell, Settings, Star, Compass, Award, ArrowLeft, LogOut, Database as DatabaseIcon, RefreshCw
+  Plus, ThumbsUp, Send, Bell, Settings, Star, Compass, Award, 
+  AlertTriangle, Radio, Zap, Crosshair, Skull, Activity, Lock, 
+  ChevronRight, Terminal, Globe, Share2, Eye, ShieldCheck, Cpu,
+  LogOut, UserPlus, Shield, UserX, Trash2, Edit3, Check, X,
+  FileText, Sliders, RefreshCw
 } from 'lucide-react';
 import { Database } from './services/database';
-import { FirestoreDB } from './services/firestoreDB';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('explore');
-  
-  // App States
+  // Database Initial Load
+  const [currentUser, setCurrentUser] = useState(Database.getSession());
+  const [activeTab, setActiveTab] = useState('explore'); // explore | match | planner | expense | social | safety | profile | admin
   const [womenOnlyMode, setWomenOnlyMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sosActive, setSosActive] = useState(false);
-  const [firestoreStatus, setFirestoreStatus] = useState('connecting'); // 'connecting' | 'connected' | 'seeded' | 'error'
-  const [dbLoading, setDbLoading] = useState(false);
-  
-  // User Profile
-  const currentUser = {
-    name: 'Sarah Jenkins',
-    email: 'sarah.j@example.com',
-    photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80',
-    bio: 'Backpacker & adventure photographer. Exploring Southeast Asia! 🌏',
-    gender: 'Female',
-    age: 23,
-    style: 'Adventure & Backpacker',
-    budget: 'Budget ($30-50/day)',
-    languages: ['English', 'Spanish', 'French'],
-    isVerified: true,
-    trustScore: 4.9,
-    tripsCompleted: 15
-  };
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [toastMessage, setToastMessage] = useState('');
 
-  // Database-backed States
+  // Real Database Collections
+  const [allUsers, setAllUsers] = useState([]);
   const [trips, setTrips] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [itinerary, setItinerary] = useState([]);
+  const [posts, setPosts] = useState([]);
+  const [sosAlerts, setSosAlerts] = useState([]);
 
-  // Load from LocalStorage on mount, then try Firestore
-  useEffect(() => {
-    // Immediate local data
+  // Modals
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showProfileEditModal, setShowProfileEditModal] = useState(false);
+  const [showCreateTripModal, setShowCreateTripModal] = useState(false);
+
+  // Forms
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+  const [authForm, setAuthForm] = useState({ emailOrCallsign: '', password: '', name: '', callsign: '', email: '', style: 'Extreme Adventure' });
+  const [profileForm, setProfileForm] = useState({ ...currentUser });
+  const [newTripForm, setNewTripForm] = useState({ title: '', destination: '', budget: '', risk: 'HIGH', isWomenOnly: false });
+  const [newExpense, setNewExpense] = useState({ title: '', amount: '', paidBy: currentUser.name, category: 'Basecamp' });
+  const [newActivity, setNewActivity] = useState({ time: '06:00 HRS', title: '', cost: '', risk: 'MODERATE' });
+  const [newPostCaption, setNewPostCaption] = useState('');
+  const [newPostImage, setNewPostImage] = useState('');
+
+  // Match Index
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+
+  // Reload all data from local real Database
+  const reloadData = () => {
+    Database.init();
+    const session = Database.getSession();
+    setCurrentUser(session);
+    setProfileForm({ ...session });
+    setAllUsers(Database.getUsers());
     setTrips(Database.getTrips());
     setExpenses(Database.getExpenses());
     setItinerary(Database.getItinerary());
+    setPosts(Database.getPosts());
+    setSosAlerts(Database.getSosAlerts());
+  };
 
-    // Try loading from Firestore emulator
-    loadFromFirestore();
+  useEffect(() => {
+    reloadData();
   }, []);
-
-  const loadFromFirestore = async () => {
-    try {
-      setDbLoading(true);
-      const firestoreTrips = await FirestoreDB.getTrips();
-      if (firestoreTrips && firestoreTrips.length > 0) {
-        setTrips(firestoreTrips.map(t => ({
-          ...t,
-          currentMembers: t.currentMemberIds?.length || t.currentMembers || 1,
-          cover: t.coverUrl || t.cover
-        })));
-        setFirestoreStatus('connected');
-      } else {
-        setFirestoreStatus('connected');
-      }
-
-      const firestoreExpenses = await FirestoreDB.getExpenses('trip_001');
-      if (firestoreExpenses && firestoreExpenses.length > 0) {
-        setExpenses(firestoreExpenses);
-      }
-
-      const firestoreItinerary = await FirestoreDB.getItinerary('trip_001');
-      if (firestoreItinerary && firestoreItinerary.length > 0) {
-        setItinerary(firestoreItinerary);
-      }
-    } catch (err) {
-      console.warn('Firestore load fallback to local:', err.message);
-      setFirestoreStatus('error');
-    } finally {
-      setDbLoading(false);
-    }
-  };
-
-  const handleSeedDatabase = async () => {
-    setDbLoading(true);
-    const success = await FirestoreDB.seedDatabase();
-    if (success) {
-      setFirestoreStatus('seeded');
-      triggerToast('🌱 Firestore Database seeded! View at http://127.0.0.1:4000/firestore');
-      await loadFromFirestore();
-    } else {
-      triggerToast('⚠️ Seed failed. Is the Firestore Emulator running?');
-    }
-    setDbLoading(false);
-  };
-
-
-
-  // Match Candidates
-  const [matchCandidates, setMatchCandidates] = useState([
-    {
-      id: 'm1',
-      name: 'Elena Rostova',
-      age: 24,
-      destination: 'Bali, Indonesia',
-      matchScore: 96,
-      photo: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=600&q=80',
-      bio: 'Solo hiker & coffee enthusiast. Looking for travel buddies for September!',
-      style: 'Adventure & Backpacker',
-      budget: 'Budget ($30-50/day)',
-      verified: true
-    },
-    {
-      id: 'm2',
-      name: 'Marcus Vance',
-      age: 26,
-      destination: 'Interlaken, Switzerland',
-      matchScore: 89,
-      photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80',
-      bio: 'Landscape photographer. Excited to conquer alpine photography spots.',
-      style: 'Photography & Camping',
-      budget: 'Moderate ($80-120/day)',
-      verified: true
-    }
-  ]);
-
-  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
-  const [toastMessage, setToastMessage] = useState('');
-
-
-  const [newExpense, setNewExpense] = useState({ title: '', amount: '', paidBy: 'You', category: 'Food' });
-
-  const [newActivity, setNewActivity] = useState({ time: '10:00 AM', title: '', cost: '' });
-
-
-  // Social Feed Posts
-  const [posts, setPosts] = useState([
-    {
-      id: 'p1',
-      author: 'Elena Rostova',
-      avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=150&q=80',
-      location: 'Ubud, Bali',
-      image: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=800&q=80',
-      caption: 'Found the most secret waterfall in Ubud today with my Travel Buddy group! 🌿💦',
-      likes: 42,
-      comments: 7,
-      isLiked: false
-    },
-    {
-      id: 'p2',
-      author: 'Marcus Vance',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
-      location: 'Interlaken, Switzerland',
-      image: 'https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?auto=format&fit=crop&w=800&q=80',
-      caption: 'Sunrise over the Swiss Alps. Solo travel is great, but sharing moments with companions is priceless! 🏔️✨',
-      likes: 89,
-      comments: 14,
-      isLiked: false
-    }
-  ]);
-
-  // Modal State for New Trip
-  const [showCreateTripModal, setShowCreateTripModal] = useState(false);
-  const [newTripForm, setNewTripForm] = useState({ title: '', destination: '', budget: '', isWomenOnly: false });
 
   const triggerToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 3500);
   };
 
-  const handleAddExpense = async (e) => {
+  // ─── AUTH HANDLERS ───
+  const handleAuthSubmit = (e) => {
     e.preventDefault();
-    if (!newExpense.title || !newExpense.amount) return;
-    const item = { id: Date.now().toString(), ...newExpense, amount: parseFloat(newExpense.amount) };
-    // Save to local
-    const updated = Database.addExpense(item);
-    setExpenses(updated);
-    // Save to Firestore
-    try { await FirestoreDB.addExpense('trip_001', item); } catch(e) { console.warn('Firestore write skipped'); }
-    setNewExpense({ title: '', amount: '', paidBy: 'You', category: 'Food' });
-    triggerToast('💰 Expense saved to Firestore Database!');
+    try {
+      if (authMode === 'login') {
+        const user = Database.login(authForm.emailOrCallsign, authForm.password);
+        setCurrentUser(user);
+        setProfileForm({ ...user });
+        setShowAuthModal(false);
+        triggerToast(`⚡ AUTHENTICATION CONFIRMED: WELCOME ${user.callsign}`);
+        if (user.role === 'admin') setActiveTab('admin');
+      } else {
+        if (!authForm.name || !authForm.email) throw new Error('PLEASE FILL IN ALL REQUIRED FIELDS');
+        const newUser = Database.register(authForm);
+        setCurrentUser(newUser);
+        setProfileForm({ ...newUser });
+        setShowAuthModal(false);
+        triggerToast(`🎉 ENLISTMENT COMPLETE: OPERATIVE ${newUser.callsign} REGISTERED`);
+      }
+      reloadData();
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
-  const handleAddActivity = async (e) => {
-    e.preventDefault();
-    if (!newActivity.title) return;
-    const item = { id: Date.now().toString(), time: newActivity.time, title: newActivity.title, cost: parseFloat(newActivity.cost || 0), votes: 1 };
-    // Save to local
-    const updated = Database.addItineraryItem(item);
-    setItinerary(updated);
-    // Save to Firestore
-    try { await FirestoreDB.addItineraryItem('trip_001', item); } catch(e) { console.warn('Firestore write skipped'); }
-    setNewActivity({ time: '10:00 AM', title: '', cost: '' });
-    triggerToast('🗓️ Activity saved to Firestore Database!');
+  const handleQuickLogin = (role) => {
+    const users = Database.getUsers();
+    const targetUser = role === 'admin' 
+      ? users.find(u => u.role === 'admin') 
+      : users.find(u => u.role === 'user' && u.id === 'usr_sarah');
+    if (targetUser) {
+      Database.setSession(targetUser);
+      setCurrentUser(targetUser);
+      setProfileForm({ ...targetUser });
+      setShowAuthModal(false);
+      triggerToast(`⚡ SWITCHED SESSION TO: ${targetUser.callsign} (${targetUser.role.toUpperCase()})`);
+      if (targetUser.role === 'admin') setActiveTab('admin');
+      else if (activeTab === 'admin') setActiveTab('explore');
+      reloadData();
+    }
   };
 
-  const handleCreateTrip = async (e) => {
+  const handleLogout = () => {
+    const users = Database.getUsers();
+    const fallbackUser = users.find(u => u.id === 'usr_sarah') || users[0];
+    Database.setSession(fallbackUser);
+    setCurrentUser(fallbackUser);
+    setProfileForm({ ...fallbackUser });
+    triggerToast('LOGGED OUT. RETURNED TO OPERATIVE DEMO SESSION.');
+    if (activeTab === 'admin') setActiveTab('explore');
+    reloadData();
+  };
+
+  // ─── PROFILE UPDATE HANDLER ───
+  const handleProfileUpdate = (e) => {
+    e.preventDefault();
+    Database.updateUser(currentUser.id, profileForm);
+    setCurrentUser({ ...currentUser, ...profileForm });
+    setShowProfileEditModal(false);
+    triggerToast('✅ NOMAD PASSPORT PROFILE UPDATED SUCCESSFULLY IN DATABASE!');
+    reloadData();
+  };
+
+  // ─── ADMIN ACTIONS ───
+  const handleToggleUserStatus = (userId) => {
+    Database.toggleUserStatus(userId);
+    triggerToast('⚡ OPERATIVE STATUS TOGGLED IN DATABASE');
+    reloadData();
+  };
+
+  const handleToggleUserVerified = (userId) => {
+    Database.toggleUserVerified(userId);
+    triggerToast('🛡️ BIOMETRIC VERIFICATION STATUS MODIFIED');
+    reloadData();
+  };
+
+  const handleDeleteUser = (userId) => {
+    if (window.confirm('ARE YOU SURE YOU WANT TO PERMANENTLY TERMINATE THIS OPERATIVE ACCOUNT?')) {
+      Database.deleteUser(userId);
+      triggerToast('🗑️ OPERATIVE RECORD PURGED FROM DATABASE');
+      reloadData();
+    }
+  };
+
+  const handleDeleteTrip = (tripId) => {
+    if (window.confirm('ABORT & DELETE THIS EXPEDITION MISSION?')) {
+      Database.deleteTrip(tripId);
+      triggerToast('🗑️ EXPEDITION PURGED FROM RADAR NETWORK');
+      reloadData();
+    }
+  };
+
+  const handleResolveSos = (alertId) => {
+    Database.resolveSos(alertId);
+    triggerToast('🚁 SEARCH & RESCUE SQUAD DISPATCHED! SOS SIGNAL MARKED AS RESOLVED.');
+    reloadData();
+  };
+
+  // ─── USER TRIP / EXPENSE / ITINERARY ACTIONS ───
+  const handleCreateTrip = (e) => {
     e.preventDefault();
     if (!newTripForm.title || !newTripForm.destination) return;
     const newTrip = {
-      id: Date.now().toString(),
-      title: newTripForm.title,
+      id: 'trip_' + Date.now(),
+      title: `OPERATION: ${newTripForm.title.toUpperCase()}`,
       destination: newTripForm.destination,
       startDate: '2026-09-15',
       endDate: '2026-09-22',
       budget: parseFloat(newTripForm.budget || 500),
       maxMembers: 4,
       currentMembers: 1,
+      risk: newTripForm.risk,
+      category: 'EXTREME EXPEDITION',
       isWomenOnly: newTripForm.isWomenOnly,
       cover: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80',
-      host: 'Sarah J.'
+      host: currentUser.name,
+      hostId: currentUser.id,
+      status: 'OPEN'
     };
-    // Save to local
-    const updated = Database.saveTrip(newTrip);
-    setTrips(updated);
-    // Save to Firestore
-    try { await FirestoreDB.addTrip(newTrip); } catch(e) { console.warn('Firestore write skipped'); }
+    Database.saveTrip(newTrip);
     setShowCreateTripModal(false);
-    setNewTripForm({ title: '', destination: '', budget: '', isWomenOnly: false });
-    triggerToast('🎉 Trip saved to Firestore Database!');
+    setNewTripForm({ title: '', destination: '', budget: '', risk: 'HIGH', isWomenOnly: false });
+    triggerToast('🚀 NEW EXPEDITION RECORDED IN DATABASE!');
+    reloadData();
   };
 
+  const handleAddExpense = (e) => {
+    e.preventDefault();
+    if (!newExpense.title || !newExpense.amount) return;
+    const item = { 
+      id: 'exp_' + Date.now(), 
+      title: newExpense.title,
+      amount: parseFloat(newExpense.amount),
+      paidBy: currentUser.name,
+      paidById: currentUser.id,
+      category: newExpense.category 
+    };
+    Database.addExpense(item);
+    setNewExpense({ title: '', amount: '', paidBy: currentUser.name, category: 'Basecamp' });
+    triggerToast('⚡ EXPENDITURE LOGGED TO SQUAD DATABASE');
+    reloadData();
+  };
 
+  const handleAddActivity = (e) => {
+    e.preventDefault();
+    if (!newActivity.title) return;
+    const item = { 
+      id: 'itn_' + Date.now(), 
+      time: newActivity.time, 
+      title: newActivity.title, 
+      cost: parseFloat(newActivity.cost || 0), 
+      votes: 1, 
+      risk: newActivity.risk 
+    };
+    Database.addItineraryItem(item);
+    setNewActivity({ time: '06:00 HRS', title: '', cost: '', risk: 'MODERATE' });
+    triggerToast('🎯 MISSION OBJECTIVE SAVED TO ITINERARY');
+    reloadData();
+  };
+
+  const handleCreatePost = (e) => {
+    e.preventDefault();
+    if (!newPostCaption) return;
+    const post = {
+      id: 'post_' + Date.now(),
+      author: currentUser.name,
+      authorId: currentUser.id,
+      callsign: currentUser.callsign,
+      avatar: currentUser.photo,
+      location: 'FIELD DEPLOYMENT // GLOBAL',
+      image: newPostImage || 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=800&q=80',
+      caption: newPostCaption,
+      likes: 1,
+      comments: 0,
+      isLiked: true,
+      threatLevel: 'TACTICAL DISPATCH'
+    };
+    Database.addPost(post);
+    setNewPostCaption('');
+    setNewPostImage('');
+    triggerToast('📡 TRANSMISSION PUBLISHED TO SOCIAL FEED');
+    reloadData();
+  };
+
+  const handleTriggerSos = () => {
+    setSosActive(true);
+    Database.triggerSos({
+      userId: currentUser.id,
+      userName: currentUser.name,
+      callsign: currentUser.callsign,
+      coordinates: 'LAT: 8.3405° S // LON: 115.0920° E',
+      location: 'Live GPS Coordinates Beacon',
+      severity: 'EXTREME DISTRESS',
+      details: 'Satellite Distress Beacon triggered by operative from mobile device.'
+    });
+    triggerToast('🚨 SOS DISTRESS SIGNAL BROADCASTED & LOGGED IN ADMIN OVERWATCH!');
+    reloadData();
+  };
+
+  // Candidates for Matching (Users excluding current user)
+  const otherUsers = allUsers.filter(u => u.id !== currentUser.id && u.role !== 'admin');
+  const activeCandidate = otherUsers[currentMatchIndex % (otherUsers.length || 1)];
+
+  // Filtered Trips
   const filteredTrips = trips.filter(t => {
     const matchesSearch = t.destination.toLowerCase().includes(searchQuery.toLowerCase()) || t.title.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesWomenOnly = womenOnlyMode ? t.isWomenOnly : true;
-    return matchesSearch && matchesWomenOnly;
+    const matchesCategory = categoryFilter === 'ALL' || t.category === categoryFilter;
+    return matchesSearch && matchesWomenOnly && matchesCategory;
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#0f172a', color: '#f8fafc', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#05070e', color: '#f1f5f9' }}>
       
-      {/* APP TOP BAR */}
+      {/* ══════════════════ TACTICAL TOP NAVIGATION ══════════════════ */}
       <header style={{
-        backgroundColor: '#1e293b',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        backgroundColor: 'rgba(8, 12, 22, 0.95)',
+        backdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(255, 19, 85, 0.25)',
+        boxShadow: '0 4px 30px rgba(0, 0, 0, 0.8), 0 1px 0 rgba(255, 19, 85, 0.4)',
         padding: '14px 28px',
         display: 'flex',
         alignItems: 'center',
@@ -242,403 +297,675 @@ export default function App() {
         top: 0,
         zIndex: 100
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        
+        {/* Left: Brand Identity */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{
-            backgroundColor: '#2196f3',
-            width: '42px',
-            height: '42px',
-            borderRadius: '14px',
+            width: '44px',
+            height: '44px',
+            backgroundColor: '#ff1355',
+            borderRadius: '10px',
+            clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(33, 150, 243, 0.4)'
+            boxShadow: '0 0 25px #ff1355'
           }}>
-            <Sparkles size={24} color="#ffffff" />
+            <Flame size={26} color="#ffffff" />
           </div>
+
           <div>
-            <h1 style={{ fontSize: '20px', fontWeight: '900', letterSpacing: '-0.5px', background: 'linear-gradient(to right, #60a5fa, #f97316)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              Travel Buddy Finder
-            </h1>
-            <p style={{ fontSize: '12px', color: '#94a3b8' }}>Connect Solo Travelers • Split Expenses • Plan Together</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h1 className="font-orbitron" style={{ fontSize: '20px', fontWeight: '900', color: '#ffffff', letterSpacing: '2px', textShadow: '0 0 12px rgba(255, 19, 85, 0.6)' }}>
+                APEX <span style={{ color: '#ff1355' }}>//</span> TRAVEL BUDDY
+              </h1>
+              <span className="font-mono-hud" style={{ fontSize: '10px', padding: '2px 6px', backgroundColor: currentUser.role === 'admin' ? 'rgba(255, 19, 85, 0.2)' : 'rgba(255, 107, 0, 0.2)', border: `1px solid ${currentUser.role === 'admin' ? '#ff1355' : '#ff6b00'}`, color: currentUser.role === 'admin' ? '#ff1355' : '#ff8c00', borderRadius: '4px', fontWeight: '700' }}>
+                {currentUser.role === 'admin' ? 'ADMIN OVERWATCH' : 'OPERATIVE MODE'}
+              </span>
+            </div>
+            <div className="font-mono-hud" style={{ fontSize: '11px', color: '#64748b', display: 'flex', gap: '12px', marginTop: '2px' }}>
+              <span>LAT: 8.34°S // LON: 115.09°E</span>
+              <span style={{ color: '#10e599' }}>● SYSTEM LIVE</span>
+            </div>
           </div>
         </div>
 
-        {/* Action Controls */}
+        {/* Right: Telemetry, SOS & User/Admin Account Switcher */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           
-          {/* Cloud Firestore Connection Badge */}
-          <div style={{
-            padding: '6px 12px',
-            backgroundColor: firestoreStatus === 'error' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-            border: `1px solid ${firestoreStatus === 'error' ? '#ef4444' : '#10b981'}`,
-            borderRadius: '10px',
-            color: firestoreStatus === 'error' ? '#f87171' : '#34d399',
-            fontSize: '12px',
-            fontWeight: '700',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}>
-            <span style={{ width: '8px', height: '8px', backgroundColor: firestoreStatus === 'error' ? '#ef4444' : '#10b981', borderRadius: '50%', boxShadow: `0 0 8px ${firestoreStatus === 'error' ? '#ef4444' : '#10b981'}` }}></span>
-            {firestoreStatus === 'connecting' && 'Firestore Connecting...'}
-            {firestoreStatus === 'connected' && 'Cloud Firestore Live'}
-            {firestoreStatus === 'seeded' && '✅ Firestore Seeded'}
-            {firestoreStatus === 'error' && 'Local Mode (Emulator Off)'}
-          </div>
-
-          {/* Seed Database Button */}
+          {/* Emergency SOS Button */}
           <button
-            onClick={handleSeedDatabase}
-            disabled={dbLoading}
+            onClick={handleTriggerSos}
+            className="tactical-btn font-orbitron"
             style={{
-              padding: '6px 12px',
-              backgroundColor: '#7c3aed',
-              border: 'none',
-              borderRadius: '10px',
-              color: '#fff',
+              padding: '9px 18px',
+              backgroundColor: sosActive ? '#ff1355' : 'rgba(255, 19, 85, 0.15)',
+              border: `1px solid ${sosActive ? '#ff1355' : 'rgba(255, 19, 85, 0.6)'}`,
+              color: '#ffffff',
+              fontWeight: '900',
               fontSize: '12px',
-              fontWeight: '700',
-              cursor: dbLoading ? 'wait' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              opacity: dbLoading ? 0.7 : 1
-            }}
-          >
-            <DatabaseIcon size={14} /> {dbLoading ? 'Seeding...' : 'Seed Database'}
-          </button>
-
-          {/* SOS Alert Trigger Button */}
-          <button
-            onClick={() => {
-              setSosActive(!sosActive);
-              triggerToast(sosActive ? '🛡️ SOS Mode Deactivated' : '🚨 EMERGENCY SOS ALERT: GPS Location sent to emergency contacts!');
-            }}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: sosActive ? '#ef4444' : 'rgba(239, 68, 68, 0.15)',
-              border: `1px solid ${sosActive ? '#ef4444' : 'rgba(239, 68, 68, 0.4)'}`,
-              borderRadius: '12px',
-              color: sosActive ? '#ffffff' : '#f87171',
-              fontWeight: '800',
-              fontSize: '13px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              transition: 'all 0.2s'
+              boxShadow: sosActive ? '0 0 30px #ff1355' : '0 0 15px rgba(255, 19, 85, 0.3)'
             }}
           >
-            <ShieldAlert size={18} /> {sosActive ? 'SOS ACTIVE' : 'EMERGENCY SOS'}
+            <ShieldAlert size={18} color="#ff1355" />
+            {sosActive ? 'BEACON TRANSMITTING' : 'EMERGENCY SOS'}
           </button>
 
-          {/* User Avatar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#0f172a', padding: '6px 12px', borderRadius: '12px', border: '1px solid #334155' }}>
-            <img src={currentUser.photo} alt={currentUser.name} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+          {/* User Account / Admin Badge Card */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            padding: '6px 14px',
+            border: `1px solid ${currentUser.role === 'admin' ? '#ff1355' : 'rgba(255, 255, 255, 0.15)'}`,
+            borderRadius: '8px'
+          }}>
+            <img src={currentUser.photo} alt="Avatar" style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'cover', border: `2px solid ${currentUser.role === 'admin' ? '#ff1355' : '#ff8c00'}` }} />
             <div style={{ textAlign: 'left' }}>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>{currentUser.name}</div>
-              <div style={{ fontSize: '10px', color: '#10b981', fontWeight: '700' }}>★ {currentUser.trustScore} Verified</div>
+              <div className="font-orbitron" style={{ fontSize: '13px', fontWeight: '800', color: '#fff' }}>
+                {currentUser.callsign}
+              </div>
+              <div className="font-mono-hud" style={{ fontSize: '10px', color: currentUser.role === 'admin' ? '#ff1355' : '#10e599', fontWeight: '800' }}>
+                {currentUser.role === 'admin' ? '🛡️ SUPREME ADMIN' : `★ ${currentUser.trustScore} VERIFIED`}
+              </div>
             </div>
+
+            {/* Auth / Switch Button */}
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="tactical-btn font-mono-hud"
+              style={{
+                marginLeft: '8px',
+                padding: '6px 10px',
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: '#fff',
+                borderRadius: '4px',
+                fontSize: '10px',
+                fontWeight: '800',
+                cursor: 'pointer'
+              }}
+            >
+              SWITCH / LOGIN
+            </button>
           </div>
 
         </div>
       </header>
 
-      {/* TOAST NOTIFICATION */}
+      {/* ══════════════════ HUD TOAST NOTIFICATION ══════════════════ */}
       {toastMessage && (
-        <div style={{
+        <div className="font-orbitron" style={{
           position: 'fixed',
-          top: '80px',
+          top: '90px',
           right: '28px',
-          backgroundColor: '#10b981',
+          backgroundColor: '#ff1355',
           color: '#ffffff',
-          padding: '12px 20px',
-          borderRadius: '12px',
-          fontWeight: '700',
-          fontSize: '14px',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
-          zIndex: 1000
+          padding: '14px 24px',
+          borderRadius: '8px',
+          fontWeight: '900',
+          fontSize: '13px',
+          boxShadow: '0 0 35px rgba(255, 19, 85, 0.7), 0 10px 25px rgba(0,0,0,0.8)',
+          border: '1px solid #ffffff',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          letterSpacing: '1px'
         }}>
+          <Zap size={18} fill="#ffffff" />
           {toastMessage}
         </div>
       )}
 
-      {/* MAIN LAYOUT */}
-      <div style={{ display: 'flex', flex: 1, maxWidth: '1400px', width: '100%', margin: '0 auto' }}>
+      {/* ══════════════════ MAIN WORKSPACE LAYOUT ══════════════════ */}
+      <div style={{ display: 'flex', flex: 1, maxWidth: '1600px', width: '100%', margin: '0 auto' }}>
         
-        {/* SIDEBAR NAVIGATION */}
+        {/* ─── TACTICAL SIDEBAR NAVIGATION ─── */}
         <aside style={{
-          width: '240px',
-          backgroundColor: '#1e293b',
+          width: '270px',
+          backgroundColor: 'rgba(8, 12, 22, 0.85)',
           borderRight: '1px solid rgba(255, 255, 255, 0.08)',
-          padding: '24px 16px',
+          padding: '28px 16px',
           display: 'flex',
           flexDirection: 'column',
           gap: '8px'
         }}>
-          <button
-            onClick={() => setActiveTab('explore')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 16px',
-              borderRadius: '12px',
-              border: 'none',
-              backgroundColor: activeTab === 'explore' ? '#2196f3' : 'transparent',
-              color: activeTab === 'explore' ? '#ffffff' : '#94a3b8',
-              fontWeight: '700',
-              fontSize: '14px',
-              cursor: 'pointer',
-              textAlign: 'left'
-            }}
-          >
-            <Compass size={18} /> Explore Trips
-          </button>
+          
+          <div className="font-mono-hud" style={{ fontSize: '10px', color: '#64748b', padding: '0 12px 10px', letterSpacing: '2px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', marginBottom: '8px' }}>
+            COMMAND NAVIGATION
+          </div>
 
-          <button
-            onClick={() => setActiveTab('match')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 16px',
-              borderRadius: '12px',
-              border: 'none',
-              backgroundColor: activeTab === 'match' ? '#2196f3' : 'transparent',
-              color: activeTab === 'match' ? '#ffffff' : '#94a3b8',
-              fontWeight: '700',
-              fontSize: '14px',
-              cursor: 'pointer',
-              textAlign: 'left'
-            }}
-          >
-            <Users size={18} /> Companion Matcher
-          </button>
+          {/* Admin Command Dashboard Tab (Only for Admin) */}
+          {currentUser.role === 'admin' && (
+            <button
+              onClick={() => setActiveTab('admin')}
+              className="tactical-btn font-orbitron"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '14px 16px',
+                backgroundColor: activeTab === 'admin' ? '#ff1355' : 'rgba(255, 19, 85, 0.15)',
+                border: '1px solid #ff1355',
+                color: '#ffffff',
+                fontWeight: '900',
+                fontSize: '12px',
+                cursor: 'pointer',
+                letterSpacing: '1px',
+                boxShadow: activeTab === 'admin' ? '0 0 25px #ff1355' : 'none',
+                marginBottom: '8px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Shield size={18} color="#fff" />
+                <span>ADMIN OVERWATCH</span>
+              </div>
+              <span className="font-mono-hud" style={{ fontSize: '10px', padding: '2px 6px', backgroundColor: '#000', color: '#ff1355', borderRadius: '3px', fontWeight: '900' }}>
+                MASTER
+              </span>
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab('planner')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 16px',
-              borderRadius: '12px',
-              border: 'none',
-              backgroundColor: activeTab === 'planner' ? '#2196f3' : 'transparent',
-              color: activeTab === 'planner' ? '#ffffff' : '#94a3b8',
-              fontWeight: '700',
-              fontSize: '14px',
-              cursor: 'pointer',
-              textAlign: 'left'
-            }}
-          >
-            <Calendar size={18} /> Day Itinerary
-          </button>
+          {[
+            { id: 'explore', label: 'RADAR EXPEDITIONS', icon: Crosshair, badge: `${trips.length} LIVE` },
+            { id: 'match', label: 'BUDDY MATCH ENGINE', icon: Zap, badge: `${otherUsers.length} FOUND` },
+            { id: 'planner', label: 'WAR ROOM ITINERARY', icon: Calendar, badge: `${itinerary.length} GOALS` },
+            { id: 'expense', label: 'WAR CHEST LEDGER', icon: DollarSign, badge: `$${expenses.reduce((a,c)=>a+c.amount,0)}` },
+            { id: 'social', label: 'COMMUNICATIONS FEED', icon: Radio, badge: `${posts.length} OPS` },
+            { id: 'safety', label: 'DEFENSE & SHIELD HUB', icon: ShieldCheck, badge: 'SECURE' },
+            { id: 'profile', label: 'NOMAD PASSPORT ID', icon: UserCheck, badge: 'EDIT' },
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className="tactical-btn font-orbitron"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '13px 16px',
+                  backgroundColor: isActive ? 'rgba(255, 19, 85, 0.18)' : 'transparent',
+                  border: isActive ? '1px solid #ff1355' : '1px solid transparent',
+                  color: isActive ? '#ffffff' : '#94a3b8',
+                  fontWeight: '800',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  letterSpacing: '1px',
+                  boxShadow: isActive ? '0 0 20px rgba(255, 19, 85, 0.35)' : 'none'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Icon size={18} color={isActive ? '#ff1355' : '#64748b'} />
+                  <span>{tab.label}</span>
+                </div>
+                <span className="font-mono-hud" style={{
+                  fontSize: '10px',
+                  padding: '2px 6px',
+                  backgroundColor: isActive ? '#ff1355' : 'rgba(255, 255, 255, 0.05)',
+                  color: isActive ? '#fff' : '#64748b',
+                  borderRadius: '3px',
+                  fontWeight: '700'
+                }}>
+                  {tab.badge}
+                </span>
+              </button>
+            );
+          })}
 
-          <button
-            onClick={() => setActiveTab('expense')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 16px',
-              borderRadius: '12px',
-              border: 'none',
-              backgroundColor: activeTab === 'expense' ? '#2196f3' : 'transparent',
-              color: activeTab === 'expense' ? '#ffffff' : '#94a3b8',
-              fontWeight: '700',
-              fontSize: '14px',
-              cursor: 'pointer',
-              textAlign: 'left'
-            }}
-          >
-            <DollarSign size={18} /> Expense Ledger
-          </button>
+          {/* Quick Actions Footer */}
+          <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button
+              onClick={() => setShowProfileEditModal(true)}
+              className="tactical-btn font-orbitron"
+              style={{
+                padding: '10px',
+                backgroundColor: 'rgba(255, 107, 0, 0.15)',
+                border: '1px solid #ff6b00',
+                color: '#ff8c00',
+                fontSize: '11px',
+                fontWeight: '900',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              <Edit3 size={14} /> EDIT MY PROFILE
+            </button>
 
-          <button
-            onClick={() => setActiveTab('social')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 16px',
-              borderRadius: '12px',
-              border: 'none',
-              backgroundColor: activeTab === 'social' ? '#2196f3' : 'transparent',
-              color: activeTab === 'social' ? '#ffffff' : '#94a3b8',
-              fontWeight: '700',
-              fontSize: '14px',
-              cursor: 'pointer',
-              textAlign: 'left'
-            }}
-          >
-            <MessageSquare size={18} /> Travel Social Feed
-          </button>
+            <button
+              onClick={handleLogout}
+              className="tactical-btn font-mono-hud"
+              style={{
+                padding: '8px',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: '#94a3b8',
+                fontSize: '11px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}
+            >
+              <LogOut size={14} /> DISCONNECT SESSION
+            </button>
+          </div>
 
-          <button
-            onClick={() => setActiveTab('safety')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 16px',
-              borderRadius: '12px',
-              border: 'none',
-              backgroundColor: activeTab === 'safety' ? '#2196f3' : 'transparent',
-              color: activeTab === 'safety' ? '#ffffff' : '#94a3b8',
-              fontWeight: '700',
-              fontSize: '14px',
-              cursor: 'pointer',
-              textAlign: 'left'
-            }}
-          >
-            <ShieldAlert size={18} /> Safety Hub
-          </button>
-
-          <button
-            onClick={() => setActiveTab('profile')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 16px',
-              borderRadius: '12px',
-              border: 'none',
-              backgroundColor: activeTab === 'profile' ? '#2196f3' : 'transparent',
-              color: activeTab === 'profile' ? '#ffffff' : '#94a3b8',
-              fontWeight: '700',
-              fontSize: '14px',
-              cursor: 'pointer',
-              textAlign: 'left'
-            }}
-          >
-            <UserCheck size={18} /> My Profile
-          </button>
         </aside>
 
-        {/* CONTENT VIEWPORT */}
-        <main style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
+        {/* ─── WORKSPACE CONTENT VIEWPORT ─── */}
+        <main style={{ flex: 1, padding: '36px', overflowY: 'auto' }}>
           
-          {/* ==================== MODULE 1: EXPLORE TRIPS ==================== */}
+          {/* ==================== MODULE: ADMIN COMMAND OVERWATCH ==================== */}
+          {activeTab === 'admin' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
+                <div>
+                  <div className="font-mono-hud" style={{ fontSize: '12px', color: '#ff1355', fontWeight: '800', letterSpacing: '2px', marginBottom: '4px' }}>
+                    // SUPREME COMMAND OVERWATCH DASHBOARD
+                  </div>
+                  <h2 className="font-orbitron" style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', letterSpacing: '1px' }}>
+                    ADMIN CONTROL & SECURITY MATRIX
+                  </h2>
+                  <p style={{ fontSize: '15px', color: '#94a3b8', marginTop: '4px' }}>
+                    Full administrative governance over registered operatives, active missions, and emergency distress beacons.
+                  </p>
+                </div>
+              </div>
+
+              {/* Admin Real-Time Telemetry Counters */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
+                <div className="cyber-card tactical-box" style={{ padding: '20px', border: '1px solid #ff1355' }}>
+                  <div className="font-mono-hud" style={{ fontSize: '11px', color: '#ff1355', fontWeight: '800' }}>REGISTERED OPERATIVES</div>
+                  <div className="font-orbitron" style={{ fontSize: '32px', fontWeight: '900', color: '#fff', marginTop: '4px' }}>
+                    {allUsers.length}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>{allUsers.filter(u=>u.status==='ACTIVE').length} Active // {allUsers.filter(u=>u.status==='SUSPENDED').length} Suspended</div>
+                </div>
+
+                <div className="cyber-card tactical-box" style={{ padding: '20px', border: '1px solid #ff6b00' }}>
+                  <div className="font-mono-hud" style={{ fontSize: '11px', color: '#ff6b00', fontWeight: '800' }}>ACTIVE EXPEDITIONS</div>
+                  <div className="font-orbitron" style={{ fontSize: '32px', fontWeight: '900', color: '#fff', marginTop: '4px' }}>
+                    {trips.length}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>Global radar deployments</div>
+                </div>
+
+                <div className="cyber-card tactical-box" style={{ padding: '20px', border: '1px solid #10e599' }}>
+                  <div className="font-mono-hud" style={{ fontSize: '11px', color: '#10e599', fontWeight: '800' }}>SQUAD TREASURY VOLUME</div>
+                  <div className="font-orbitron" style={{ fontSize: '32px', fontWeight: '900', color: '#fff', marginTop: '4px' }}>
+                    ${expenses.reduce((a,c)=>a+c.amount,0).toFixed(0)}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>{expenses.length} Total expenditures logged</div>
+                </div>
+
+                <div className="cyber-card tactical-box" style={{ padding: '20px', border: '1px solid #ec4899' }}>
+                  <div className="font-mono-hud" style={{ fontSize: '11px', color: '#ec4899', fontWeight: '800' }}>SOS DISTRESS SIGNALS</div>
+                  <div className="font-orbitron" style={{ fontSize: '32px', fontWeight: '900', color: '#fff', marginTop: '4px' }}>
+                    {sosAlerts.filter(a => a.status === 'ACTIVE').length}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>Active rescue beacons</div>
+                </div>
+              </div>
+
+              {/* 1. SOS Live Distress Management */}
+              <div style={{ marginBottom: '36px' }}>
+                <h3 className="font-orbitron" style={{ fontSize: '18px', fontWeight: '900', color: '#ff1355', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertTriangle size={20} /> LIVE DISTRESS BEACONS (SEARCH & RESCUE)
+                </h3>
+
+                {sosAlerts.length === 0 ? (
+                  <div style={{ padding: '20px', backgroundColor: 'rgba(16,229,153,0.1)', border: '1px solid #10e599', borderRadius: '8px', color: '#10e599' }} className="font-mono-hud">
+                    ALL FREQUENCIES CLEAR. NO ACTIVE DISTRESS SIGNALS.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {sosAlerts.map(alert => (
+                      <div key={alert.id} className="cyber-card" style={{ padding: '20px', borderRadius: '8px', border: `1px solid ${alert.status === 'ACTIVE' ? '#ff1355' : '#10e599'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span className="font-orbitron" style={{ fontSize: '16px', fontWeight: '900', color: '#fff' }}>{alert.userName}</span>
+                            <span className="font-mono-hud" style={{ fontSize: '11px', color: '#ff8c00' }}>[{alert.callsign}]</span>
+                            <span className="font-mono-hud" style={{ padding: '2px 8px', backgroundColor: alert.status === 'ACTIVE' ? '#ff1355' : '#10e599', color: '#fff', borderRadius: '4px', fontSize: '10px', fontWeight: '800' }}>
+                              {alert.status}
+                            </span>
+                          </div>
+                          <div className="font-mono-hud" style={{ fontSize: '12px', color: '#ff8c00', marginTop: '4px' }}>
+                            {alert.coordinates} // {alert.location}
+                          </div>
+                          <p style={{ fontSize: '13px', color: '#cbd5e1', marginTop: '6px' }}>{alert.details}</p>
+                        </div>
+
+                        {alert.status === 'ACTIVE' && (
+                          <button
+                            onClick={() => handleResolveSos(alert.id)}
+                            className="tactical-btn font-orbitron"
+                            style={{ padding: '10px 20px', backgroundColor: '#10e599', color: '#000', border: 'none', fontWeight: '900', fontSize: '12px', cursor: 'pointer' }}
+                          >
+                            DISPATCH RESCUE & RESOLVE
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Operatives Management Table */}
+              <div style={{ marginBottom: '36px' }}>
+                <h3 className="font-orbitron" style={{ fontSize: '18px', fontWeight: '900', color: '#fff', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Users size={20} color="#ff8c00" /> REGISTERED OPERATIVES GOVERNANCE ({allUsers.length})
+                </h3>
+
+                <div className="cyber-card" style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                    <thead>
+                      <tr className="font-mono-hud" style={{ backgroundColor: 'rgba(5,7,14,0.9)', borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#64748b' }}>
+                        <th style={{ padding: '14px 16px' }}>OPERATIVE</th>
+                        <th style={{ padding: '14px 16px' }}>ROLE</th>
+                        <th style={{ padding: '14px 16px' }}>STATUS</th>
+                        <th style={{ padding: '14px 16px' }}>VERIFIED</th>
+                        <th style={{ padding: '14px 16px' }}>TRUST SCORE</th>
+                        <th style={{ padding: '14px 16px', textAlign: 'right' }}>ADMIN CONTROLS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allUsers.map(u => (
+                        <tr key={u.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <td style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <img src={u.photo} alt={u.name} style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'cover' }} />
+                            <div>
+                              <div style={{ fontWeight: '800', color: '#fff' }}>{u.name}</div>
+                              <div className="font-mono-hud" style={{ fontSize: '11px', color: '#ff8c00' }}>[{u.callsign}] • {u.email}</div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '14px 16px' }}>
+                            <span className="font-mono-hud" style={{ padding: '2px 8px', backgroundColor: u.role === 'admin' ? '#ff1355' : 'rgba(255,255,255,0.1)', color: '#fff', borderRadius: '4px', fontSize: '10px', fontWeight: '800' }}>
+                              {u.role.toUpperCase()}
+                            </span>
+                          </td>
+                          <td style={{ padding: '14px 16px' }}>
+                            <span className="font-mono-hud" style={{ color: u.status === 'ACTIVE' ? '#10e599' : '#ef4444', fontWeight: '800' }}>
+                              {u.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '14px 16px' }}>
+                            {u.isVerified ? <span style={{ color: '#10e599', fontWeight: '800' }}>✓ VERIFIED</span> : <span style={{ color: '#64748b' }}>UNVERIFIED</span>}
+                          </td>
+                          <td style={{ padding: '14px 16px', fontWeight: '800', color: '#ff8c00' }}>
+                            ★ {u.trustScore}
+                          </td>
+                          <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                            {u.role !== 'admin' && (
+                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                <button
+                                  onClick={() => handleToggleUserStatus(u.id)}
+                                  className="font-mono-hud"
+                                  style={{ padding: '4px 8px', backgroundColor: u.status === 'ACTIVE' ? 'rgba(239,68,68,0.2)' : 'rgba(16,229,153,0.2)', border: `1px solid ${u.status === 'ACTIVE' ? '#ef4444' : '#10e599'}`, color: u.status === 'ACTIVE' ? '#ef4444' : '#10e599', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}
+                                >
+                                  {u.status === 'ACTIVE' ? 'SUSPEND' : 'ACTIVATE'}
+                                </button>
+                                <button
+                                  onClick={() => handleToggleUserVerified(u.id)}
+                                  className="font-mono-hud"
+                                  style={{ padding: '4px 8px', backgroundColor: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}
+                                >
+                                  {u.isVerified ? 'UNVERIFY' : 'VERIFY'}
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUser(u.id)}
+                                  className="font-mono-hud"
+                                  style={{ padding: '4px 8px', backgroundColor: 'rgba(239,68,68,0.3)', border: '1px solid #ef4444', color: '#fff', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}
+                                >
+                                  DELETE
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 3. Expeditions Force Control */}
+              <div>
+                <h3 className="font-orbitron" style={{ fontSize: '18px', fontWeight: '900', color: '#fff', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Crosshair size={20} color="#ff1355" /> GLOBAL EXPEDITIONS GOVERNANCE ({trips.length})
+                </h3>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+                  {trips.map(trip => (
+                    <div key={trip.id} className="cyber-card" style={{ padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span className="font-mono-hud" style={{ fontSize: '10px', color: '#ff8c00', fontWeight: '800' }}>{trip.destination}</span>
+                        <span className="font-mono-hud" style={{ fontSize: '10px', padding: '2px 6px', backgroundColor: '#ff1355', color: '#fff', borderRadius: '3px' }}>{trip.risk}</span>
+                      </div>
+                      <h4 className="font-orbitron" style={{ fontSize: '15px', color: '#fff', marginBottom: '8px' }}>{trip.title}</h4>
+                      <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '12px' }}>
+                        Host: {trip.host} • Bounty: ${trip.budget} USD
+                      </div>
+                      <button
+                        onClick={() => handleDeleteTrip(trip.id)}
+                        className="tactical-btn font-orbitron"
+                        style={{ width: '100%', padding: '8px', backgroundColor: 'rgba(239,68,68,0.2)', border: '1px solid #ef4444', color: '#ef4444', fontSize: '11px', fontWeight: '800', cursor: 'pointer' }}
+                      >
+                        [ABORT & PURGE MISSION]
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* ==================== MODULE 1: RADAR EXPEDITIONS ==================== */}
           {activeTab === 'explore' && (
             <div>
-              {/* Header & Controls */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
                 <div>
-                  <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#fff' }}>Explore Upcoming Trips</h2>
-                  <p style={{ fontSize: '14px', color: '#94a3b8' }}>Discover trip plans created by travelers worldwide.</p>
+                  <div className="font-mono-hud" style={{ fontSize: '12px', color: '#ff1355', fontWeight: '800', letterSpacing: '2px', marginBottom: '4px' }}>
+                    // GLOBAL RADAR DISPATCH
+                  </div>
+                  <h2 className="font-orbitron" style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', letterSpacing: '1px' }}>
+                    ACTIVE EXPEDITIONS & MISSIONS
+                  </h2>
+                  <p style={{ fontSize: '15px', color: '#94a3b8', marginTop: '4px' }}>
+                    Join battle-ready solo adventurers deploying to high-intensity global destinations.
+                  </p>
                 </div>
 
                 <button
                   onClick={() => setShowCreateTripModal(true)}
+                  className="tactical-btn font-orbitron"
                   style={{
-                    padding: '12px 20px',
-                    backgroundColor: '#2196f3',
+                    padding: '14px 24px',
+                    backgroundColor: '#ff1355',
                     color: '#ffffff',
                     border: 'none',
-                    borderRadius: '12px',
+                    fontWeight: '900',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    boxShadow: '0 0 25px rgba(255, 19, 85, 0.6)',
+                    letterSpacing: '1.5px'
+                  }}
+                >
+                  <Plus size={20} /> HOST EXPEDITION
+                </button>
+              </div>
+
+              {/* Category Filters */}
+              <div style={{ display: 'flex', gap: '14px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                {['ALL', 'VOLCANO TREK', 'ALPINE PEAKS', 'NIGHT TREK'].map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setCategoryFilter(cat)}
+                    className="font-mono-hud"
+                    style={{
+                      padding: '8px 18px',
+                      backgroundColor: categoryFilter === cat ? '#ff6b00' : 'rgba(15, 23, 42, 0.7)',
+                      border: `1px solid ${categoryFilter === cat ? '#ff6b00' : 'rgba(255, 255, 255, 0.1)'}`,
+                      color: '#ffffff',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      letterSpacing: '1px'
+                    }}
+                  >
+                    [{cat}]
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => setWomenOnlyMode(!womenOnlyMode)}
+                  className="font-mono-hud"
+                  style={{
+                    padding: '8px 18px',
+                    backgroundColor: womenOnlyMode ? '#ec4899' : 'rgba(15, 23, 42, 0.7)',
+                    border: `1px solid ${womenOnlyMode ? '#ec4899' : 'rgba(255, 255, 255, 0.1)'}`,
+                    color: '#ffffff',
+                    borderRadius: '4px',
+                    fontSize: '12px',
                     fontWeight: '800',
-                    fontSize: '14px',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 14px rgba(33, 150, 243, 0.4)'
+                    marginLeft: 'auto'
                   }}
                 >
-                  <Plus size={18} /> Host New Trip
+                  <ShieldAlert size={16} /> WOMEN SHIELD MODE: {womenOnlyMode ? 'ON' : 'OFF'}
                 </button>
               </div>
 
-              {/* Filter Bar */}
-              <div style={{ display: 'flex', gap: '16px', marginBottom: '28px', flexWrap: 'wrap' }}>
-                <div style={{ position: 'relative', flex: 1, minWidth: '280px' }}>
-                  <input
-                    type="text"
-                    placeholder="Search by destination (e.g. Bali, Interlaken, Kyoto)..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{ width: '100%', padding: '12px 16px 12px 42px', backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px', color: '#fff', fontSize: '14px' }}
-                  />
-                  <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '14px' }} />
-                </div>
-
-                {/* Women Only Mode Switcher */}
-                <button
-                  onClick={() => setWomenOnlyMode(!womenOnlyMode)}
+              {/* Search Bar */}
+              <div style={{ position: 'relative', marginBottom: '32px' }}>
+                <input
+                  type="text"
+                  placeholder="SEARCH MISSIONS BY COORDINATES OR DESTINATION (E.G. BALI, SWISS ALPS, KYOTO)..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="font-mono-hud"
                   style={{
-                    padding: '12px 20px',
-                    backgroundColor: womenOnlyMode ? '#ec4899' : '#1e293b',
-                    border: `1px solid ${womenOnlyMode ? '#ec4899' : '#334155'}`,
-                    borderRadius: '12px',
+                    width: '100%',
+                    padding: '14px 18px 14px 48px',
+                    backgroundColor: 'rgba(11, 15, 25, 0.9)',
+                    border: '1px solid rgba(255, 19, 85, 0.3)',
+                    borderRadius: '8px',
                     color: '#fff',
-                    fontWeight: '700',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
+                    fontSize: '13px',
+                    boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.5)'
                   }}
-                >
-                  <ShieldAlert size={16} /> Women-Only Trips {womenOnlyMode ? 'ON' : 'OFF'}
-                </button>
+                />
+                <Search size={20} color="#ff1355" style={{ position: 'absolute', left: '16px', top: '15px' }} />
               </div>
 
-              {/* Trip Cards Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '24px' }}>
+              {/* Mission Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '28px' }}>
                 {filteredTrips.map(trip => (
-                  <div key={trip.id} style={{ backgroundColor: '#1e293b', borderRadius: '20px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.08)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.3)' }}>
-                    <div style={{ height: '180px', backgroundImage: `url(${trip.cover})`, backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative', padding: '16px' }}>
-                      <span style={{
-                        position: 'absolute',
-                        top: '16px',
-                        right: '16px',
-                        padding: '4px 12px',
-                        backgroundColor: trip.isWomenOnly ? '#ec4899' : '#2196f3',
-                        color: '#fff',
-                        borderRadius: '20px',
-                        fontSize: '12px',
-                        fontWeight: '800'
-                      }}>
-                        {trip.isWomenOnly ? '♀ Women Only' : 'Mixed Group'}
-                      </span>
+                  <div key={trip.id} className="cyber-card tactical-box" style={{ overflow: 'hidden' }}>
+                    
+                    <div style={{ height: '210px', backgroundImage: `url(${trip.cover})`, backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative', padding: '16px' }}>
+                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(to bottom, rgba(5,7,14,0.4), rgba(5,7,14,0.95))' }}></div>
+                      
+                      <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="font-mono-hud" style={{
+                          padding: '4px 10px',
+                          backgroundColor: trip.risk === 'EXTREME' ? '#ff1355' : '#ff6b00',
+                          color: '#fff',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: '900',
+                          letterSpacing: '1px'
+                        }}>
+                          RISK: {trip.risk || 'HIGH'}
+                        </span>
+
+                        {trip.isWomenOnly && (
+                          <span className="font-mono-hud" style={{ padding: '4px 10px', backgroundColor: '#ec4899', color: '#fff', borderRadius: '4px', fontSize: '11px', fontWeight: '900' }}>
+                            ♀ WOMEN ONLY SQUAD
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ position: 'absolute', bottom: '16px', left: '16px', right: '16px' }}>
+                        <div className="font-mono-hud" style={{ fontSize: '12px', color: '#ff8c00', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <MapPin size={14} /> {trip.destination}
+                        </div>
+                        <h3 className="font-orbitron" style={{ fontSize: '17px', fontWeight: '900', color: '#fff', marginTop: '4px', textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>
+                          {trip.title}
+                        </h3>
+                      </div>
                     </div>
 
                     <div style={{ padding: '20px' }}>
-                      <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#fff', marginBottom: '6px' }}>{trip.title}</h3>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f97316', fontSize: '13px', fontWeight: '700', marginBottom: '12px' }}>
-                        <MapPin size={14} /> {trip.destination}
-                      </div>
-
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid #334155', fontSize: '13px' }}>
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px', padding: '12px', backgroundColor: 'rgba(5,7,14,0.6)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
                         <div>
-                          <span style={{ color: '#94a3b8' }}>Est. Budget: </span>
-                          <strong style={{ color: '#10b981' }}>${trip.budget}</strong>
+                          <span className="font-mono-hud" style={{ fontSize: '10px', color: '#64748b' }}>EXPEDITION BOUNTY</span>
+                          <div className="font-orbitron" style={{ fontSize: '18px', fontWeight: '900', color: '#10e599' }}>
+                            ${trip.budget} <span style={{ fontSize: '11px', color: '#64748b' }}>USD</span>
+                          </div>
                         </div>
                         <div>
-                          <span style={{ color: '#94a3b8' }}>Members: </span>
-                          <strong style={{ color: '#60a5fa' }}>{trip.currentMembers}/{trip.maxMembers}</strong>
+                          <span className="font-mono-hud" style={{ fontSize: '10px', color: '#64748b' }}>SQUAD COMPLEMENT</span>
+                          <div className="font-orbitron" style={{ fontSize: '18px', fontWeight: '900', color: '#ff8c00' }}>
+                            {trip.currentMembers}/{trip.maxMembers} <span style={{ fontSize: '11px', color: '#64748b' }}>OPERATIVES</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#94a3b8', marginBottom: '6px' }} className="font-mono-hud">
+                          <span>SQUAD CAPACITY</span>
+                          <span>{Math.round((trip.currentMembers / trip.maxMembers) * 100)}% LOCKED</span>
+                        </div>
+                        <div style={{ height: '6px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${(trip.currentMembers / trip.maxMembers) * 100}%`, backgroundColor: '#ff1355', boxShadow: '0 0 10px #ff1355' }}></div>
                         </div>
                       </div>
 
                       <button
-                        onClick={() => triggerToast(`🎉 Join Request sent for "${trip.title}"`)}
+                        onClick={() => triggerToast(`⚡ REQUISITION TRANSMITTED TO COMMAND FOR "${trip.title}"`)}
+                        className="tactical-btn font-orbitron"
                         style={{
                           width: '100%',
-                          marginTop: '16px',
-                          padding: '10px',
-                          backgroundColor: '#334155',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '10px',
-                          fontWeight: '700',
-                          fontSize: '13px',
-                          cursor: 'pointer'
+                          padding: '12px',
+                          backgroundColor: 'rgba(255, 19, 85, 0.15)',
+                          border: '1px solid #ff1355',
+                          color: '#ffffff',
+                          fontWeight: '900',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          letterSpacing: '1.5px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px'
                         }}
                       >
-                        Send Join Request
+                        <Crosshair size={16} /> REQUEST SQUAD DEPLOYMENT
                       </button>
+
                     </div>
                   </div>
                 ))}
@@ -646,130 +973,232 @@ export default function App() {
             </div>
           )}
 
-          {/* ==================== MODULE 2: COMPANION MATCHER ==================== */}
+          {/* ==================== MODULE 2: BUDDY MATCH ENGINE ==================== */}
           {activeTab === 'match' && (
-            <div style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#fff', marginBottom: '6px' }}>Smart Companion Matcher</h2>
-              <p style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '24px' }}>Matching based on travel style, budget tier, and language overlap.</p>
+            <div style={{ maxWidth: '750px', margin: '0 auto', textAlign: 'center' }}>
+              
+              <div className="font-mono-hud" style={{ fontSize: '12px', color: '#ff6b00', fontWeight: '800', letterSpacing: '2px', marginBottom: '4px' }}>
+                // BIOMETRIC COMPATIBILITY ENGINE
+              </div>
+              <h2 className="font-orbitron" style={{ fontSize: '28px', fontWeight: '900', color: '#fff', letterSpacing: '1.5px', marginBottom: '6px' }}>
+                TACTICAL RADAR BUDDY MATCHER
+              </h2>
+              <p style={{ fontSize: '15px', color: '#94a3b8', marginBottom: '28px' }}>
+                Real-time algorithmic synchronization matching real registered operatives in the database.
+              </p>
 
-              {matchCandidates[currentMatchIndex] ? (
-                <div style={{
-                  backgroundColor: '#1e293b',
-                  borderRadius: '24px',
-                  overflow: 'hidden',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)'
-                }}>
+              {activeCandidate ? (
+                <div className="cyber-card tactical-box glow-crimson" style={{ overflow: 'hidden', border: '1px solid #ff1355' }}>
+                  
                   <div style={{
-                    height: '420px',
-                    backgroundImage: `url(${matchCandidates[currentMatchIndex].photo})`,
+                    height: '460px',
+                    backgroundImage: `url(${activeCandidate.photo})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     position: 'relative',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
-                    padding: '24px'
+                    padding: '28px'
                   }}>
-                    <div style={{ textAlign: 'right' }}>
-                      <span style={{ padding: '6px 14px', backgroundColor: 'rgba(33, 150, 243, 0.9)', color: '#fff', borderRadius: '20px', fontSize: '13px', fontWeight: '800' }}>
-                        {matchCandidates[currentMatchIndex].matchScore}% Compatibility
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(to top, rgba(5,7,14,0.98) 25%, transparent 80%)' }}></div>
+
+                    <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="font-mono-hud" style={{ padding: '6px 12px', backgroundColor: 'rgba(5,7,14,0.8)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '4px', fontSize: '12px', fontWeight: '800' }}>
+                        CALLSIGN: {activeCandidate.callsign}
                       </span>
+
+                      <div className="font-orbitron" style={{ padding: '8px 16px', backgroundColor: '#ff1355', color: '#fff', borderRadius: '6px', fontSize: '14px', fontWeight: '900', boxShadow: '0 0 20px #ff1355', letterSpacing: '1px' }}>
+                        ⚡ 96% SYNC RATE
+                      </div>
                     </div>
 
-                    <div style={{ textAlign: 'left', background: 'linear-gradient(to top, rgba(15,23,42,0.95), transparent)', padding: '20px', borderRadius: '16px', color: '#fff' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <h3 style={{ fontSize: '24px', fontWeight: '900' }}>{matchCandidates[currentMatchIndex].name}, {matchCandidates[currentMatchIndex].age}</h3>
-                        <CheckCircle2 size={20} color="#60a5fa" />
+                    <div style={{ position: 'relative', textAlign: 'left' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <h3 className="font-orbitron" style={{ fontSize: '26px', fontWeight: '900', color: '#fff' }}>
+                          {activeCandidate.name}, {activeCandidate.age}
+                        </h3>
+                        {activeCandidate.isVerified && <CheckCircle2 size={22} color="#10e599" />}
                       </div>
-                      <div style={{ fontSize: '14px', color: '#f97316', fontWeight: '700', marginTop: '4px' }}>
-                        Destination: {matchCandidates[currentMatchIndex].destination}
+
+                      <div className="font-mono-hud" style={{ fontSize: '13px', color: '#ff8c00', fontWeight: '800', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <MapPin size={15} /> STYLE: {activeCandidate.style}
                       </div>
-                      <p style={{ fontSize: '13px', color: '#cbd5e1', marginTop: '8px' }}>
-                        {matchCandidates[currentMatchIndex].bio}
+
+                      <p style={{ fontSize: '14px', color: '#cbd5e1', marginTop: '10px', lineHeight: '1.6' }}>
+                        "{activeCandidate.bio}"
                       </p>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginTop: '16px' }}>
+                        <div style={{ backgroundColor: 'rgba(5,7,14,0.8)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div className="font-mono-hud" style={{ fontSize: '10px', color: '#64748b' }}>TRUST RATING</div>
+                          <div className="font-orbitron" style={{ fontSize: '16px', color: '#10e599', fontWeight: '900' }}>
+                            ★ {activeCandidate.trustScore}
+                          </div>
+                        </div>
+                        <div style={{ backgroundColor: 'rgba(5,7,14,0.8)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div className="font-mono-hud" style={{ fontSize: '10px', color: '#64748b' }}>EXPEDITIONS</div>
+                          <div className="font-orbitron" style={{ fontSize: '16px', color: '#ff8c00', fontWeight: '900' }}>
+                            {activeCandidate.expeditionsCompleted} LOGGED
+                          </div>
+                        </div>
+                        <div style={{ backgroundColor: 'rgba(5,7,14,0.8)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div className="font-mono-hud" style={{ fontSize: '10px', color: '#64748b' }}>LANGUAGES</div>
+                          <div className="font-orbitron" style={{ fontSize: '14px', color: '#ff1355', fontWeight: '900' }}>
+                            {activeCandidate.languages?.join(', ') || 'English'}
+                          </div>
+                        </div>
+                      </div>
+
                     </div>
                   </div>
 
-                  <div style={{ padding: '24px', display: 'flex', justifyContent: 'space-evenly', alignItems: 'center', backgroundColor: '#0f172a' }}>
+                  <div style={{ padding: '24px', display: 'flex', justifyContent: 'space-evenly', alignItems: 'center', backgroundColor: '#080c16', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    
                     <button
-                      onClick={() => setCurrentMatchIndex((currentMatchIndex + 1) % matchCandidates.length)}
-                      style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: '#1e293b', border: '1px solid #ef4444', color: '#ef4444', fontSize: '20px', fontWeight: 'bold', cursor: 'pointer' }}
+                      onClick={() => setCurrentMatchIndex(currentMatchIndex + 1)}
+                      className="tactical-btn font-orbitron"
+                      style={{
+                        padding: '14px 28px',
+                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid #ef4444',
+                        color: '#ef4444',
+                        fontWeight: '900',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        letterSpacing: '1.5px'
+                      }}
                     >
-                      ✕
+                      [✕ NEXT OPERATIVE]
                     </button>
+
                     <button
                       onClick={() => {
-                        triggerToast(`💖 Match Request sent to ${matchCandidates[currentMatchIndex].name}!`);
-                        setCurrentMatchIndex((currentMatchIndex + 1) % matchCandidates.length);
+                        triggerToast(`⚡ TACTICAL ALLIANCE REQUISITION TRANSMITTED TO ${activeCandidate.callsign}!`);
+                        setCurrentMatchIndex(currentMatchIndex + 1);
                       }}
-                      style={{ width: '72px', height: '72px', borderRadius: '50%', backgroundColor: '#2196f3', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 20px rgba(33, 150, 243, 0.4)' }}
+                      className="tactical-btn font-orbitron"
+                      style={{
+                        padding: '16px 36px',
+                        backgroundColor: '#ff1355',
+                        border: 'none',
+                        color: '#ffffff',
+                        fontWeight: '900',
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        boxShadow: '0 0 35px #ff1355',
+                        letterSpacing: '2px'
+                      }}
                     >
-                      <Heart size={36} fill="#ffffff" />
+                      <Zap size={22} fill="#ffffff" /> [LOCK IN BUDDY]
                     </button>
+
                   </div>
                 </div>
               ) : (
-                <div style={{ padding: '60px', backgroundColor: '#1e293b', borderRadius: '24px', color: '#94a3b8' }}>
-                  <p style={{ fontSize: '16px', marginBottom: '16px' }}>You have reviewed all matched candidates!</p>
-                  <button onClick={() => setCurrentMatchIndex(0)} style={{ padding: '12px 24px', backgroundColor: '#2196f3', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: '700', cursor: 'pointer' }}>
-                    Reload Candidate Stack
+                <div style={{ padding: '80px 40px', backgroundColor: 'rgba(11, 15, 25, 0.8)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <Cpu size={48} color="#ff1355" style={{ margin: '0 auto 16px' }} />
+                  <h3 className="font-orbitron" style={{ fontSize: '20px', color: '#fff', marginBottom: '8px' }}>
+                    ALL REGISTERED OPERATIVES SCANNED
+                  </h3>
+                  <button
+                    onClick={() => setCurrentMatchIndex(0)}
+                    className="tactical-btn font-orbitron"
+                    style={{ padding: '12px 28px', backgroundColor: '#ff1355', color: '#fff', border: 'none', fontWeight: '900', fontSize: '13px', cursor: 'pointer' }}
+                  >
+                    RESET RADAR STACK
                   </button>
                 </div>
               )}
+
             </div>
           )}
 
-          {/* ==================== MODULE 3: DAY ITINERARY ==================== */}
+          {/* ==================== MODULE 3: WAR ROOM ITINERARY ==================== */}
           {activeTab === 'planner' && (
-            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <div>
-                  <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#fff' }}>Day 1: Ubud Waterfall & Rice Terraces</h2>
-                  <p style={{ fontSize: '14px', color: '#94a3b8' }}>Propose activities and vote on group schedule choices.</p>
+            <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+              <div style={{ marginBottom: '28px' }}>
+                <div className="font-mono-hud" style={{ fontSize: '12px', color: '#ff6b00', fontWeight: '800', letterSpacing: '2px', marginBottom: '4px' }}>
+                  // EXPEDITION TIMELINE PROTOCOL
                 </div>
+                <h2 className="font-orbitron" style={{ fontSize: '28px', fontWeight: '900', color: '#fff', letterSpacing: '1px' }}>
+                  WAR ROOM MISSION ITINERARY
+                </h2>
+                <p style={{ fontSize: '15px', color: '#94a3b8', marginTop: '4px' }}>
+                  Collaborative day-by-day objective scheduling and democratic squad voting.
+                </p>
               </div>
 
-              {/* Add Activity Form */}
-              <form onSubmit={handleAddActivity} style={{ backgroundColor: '#1e293b', padding: '20px', borderRadius: '16px', marginBottom: '24px', display: 'flex', gap: '12px' }}>
+              {/* Propose Objective Form */}
+              <form onSubmit={handleAddActivity} className="cyber-card" style={{ padding: '24px', borderRadius: '12px', marginBottom: '28px', display: 'flex', gap: '14px', flexWrap: 'wrap', border: '1px solid rgba(255, 19, 85, 0.3)' }}>
                 <input
                   type="text"
-                  placeholder="Time Slot (e.g. 09:00 AM)"
+                  placeholder="TIME (E.G. 05:30 HRS)"
                   value={newActivity.time}
                   onChange={(e) => setNewActivity({...newActivity, time: e.target.value})}
-                  style={{ width: '140px', padding: '10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#fff', fontSize: '13px' }}
+                  className="font-mono-hud"
+                  style={{ width: '170px', padding: '12px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '13px' }}
                 />
                 <input
                   type="text"
-                  placeholder="Activity Title (e.g. Tegenungan Hike)"
+                  placeholder="MISSION OBJECTIVE TITLE (E.G. CANYON DESCENT & DRONE SCAN)"
                   value={newActivity.title}
                   onChange={(e) => setNewActivity({...newActivity, title: e.target.value})}
-                  style={{ flex: 1, padding: '10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#fff', fontSize: '13px' }}
+                  className="font-mono-hud"
+                  style={{ flex: 1, minWidth: '260px', padding: '12px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '13px' }}
                 />
-                <button type="submit" style={{ padding: '10px 20px', backgroundColor: '#2196f3', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
-                  + Propose
+                <select
+                  value={newActivity.risk}
+                  onChange={(e) => setNewActivity({...newActivity, risk: e.target.value})}
+                  className="font-mono-hud"
+                  style={{ width: '150px', padding: '12px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#ff8c00', fontSize: '13px', fontWeight: '800' }}
+                >
+                  <option value="LOW">LOW RISK</option>
+                  <option value="MODERATE">MODERATE</option>
+                  <option value="HIGH">HIGH RISK</option>
+                  <option value="EXTREME">EXTREME</option>
+                </select>
+                <button
+                  type="submit"
+                  className="tactical-btn font-orbitron"
+                  style={{ padding: '12px 24px', backgroundColor: '#ff1355', color: '#fff', border: 'none', fontWeight: '900', fontSize: '13px', cursor: 'pointer', boxShadow: '0 0 15px rgba(255, 19, 85, 0.5)' }}
+                >
+                  + INSERT OBJECTIVE
                 </button>
               </form>
 
-              {/* Activity Items List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {itinerary.map(item => (
-                  <div key={item.id} style={{ backgroundColor: '#1e293b', padding: '16px 20px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <span style={{ padding: '6px 12px', backgroundColor: 'rgba(33, 150, 243, 0.15)', color: '#60a5fa', borderRadius: '8px', fontWeight: '800', fontSize: '12px' }}>
+              {/* Itinerary Timeline */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {itinerary.map((item, idx) => (
+                  <div key={item.id} className="cyber-card tactical-box" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                      <div className="font-orbitron" style={{ padding: '8px 14px', backgroundColor: '#ff1355', color: '#fff', borderRadius: '4px', fontWeight: '900', fontSize: '12px', letterSpacing: '1px' }}>
                         {item.time}
-                      </span>
+                      </div>
                       <div>
-                        <div style={{ fontWeight: '800', color: '#fff', fontSize: '15px' }}>{item.title}</div>
-                        <div style={{ fontSize: '12px', color: '#94a3b8' }}>Est. Cost: ${item.cost}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <h4 className="font-orbitron" style={{ fontSize: '17px', fontWeight: '900', color: '#fff' }}>{item.title}</h4>
+                          <span className="font-mono-hud" style={{ fontSize: '10px', padding: '2px 8px', backgroundColor: item.risk === 'EXTREME' ? 'rgba(255, 19, 85, 0.2)' : 'rgba(255, 107, 0, 0.2)', border: `1px solid ${item.risk === 'EXTREME' ? '#ff1355' : '#ff6b00'}`, color: item.risk === 'EXTREME' ? '#ff1355' : '#ff8c00', borderRadius: '4px', fontWeight: '800' }}>
+                            {item.risk || 'MODERATE'}
+                          </span>
+                        </div>
+                        <div className="font-mono-hud" style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                          EST. BOUNTY: ${item.cost} USD // PHASE 0{idx + 1}
+                        </div>
                       </div>
                     </div>
-
                     <button
-                      onClick={() => setItinerary(itinerary.map(i => i.id === item.id ? {...i, votes: i.votes + 1} : i))}
-                      style={{ padding: '8px 16px', backgroundColor: '#334155', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', fontSize: '13px' }}
+                      onClick={() => {
+                        Database.upvoteItineraryItem(item.id);
+                        reloadData();
+                      }}
+                      className="tactical-btn font-orbitron"
+                      style={{ padding: '10px 18px', backgroundColor: 'rgba(255, 107, 0, 0.15)', border: '1px solid #ff6b00', color: '#ff8c00', fontWeight: '900', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
-                      <ThumbsUp size={16} color="#60a5fa" /> {item.votes} Upvotes
+                      <ThumbsUp size={16} /> {item.votes} VOTES
                     </button>
                   </div>
                 ))}
@@ -777,61 +1206,77 @@ export default function App() {
             </div>
           )}
 
-          {/* ==================== MODULE 4: EXPENSE LEDGER ==================== */}
+          {/* ==================== MODULE 4: WAR CHEST LEDGER ==================== */}
           {activeTab === 'expense' && (
-            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#fff', marginBottom: '6px' }}>Group Expense Splitter</h2>
-              <p style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '24px' }}>Automatic net debt calculation ("Who Owes Whom").</p>
-
-              {/* Total Card */}
-              <div style={{ backgroundColor: '#2196f3', padding: '24px', borderRadius: '20px', color: '#fff', marginBottom: '24px' }}>
-                <div style={{ fontSize: '14px', opacity: 0.9 }}>Total Group Expenses</div>
-                <div style={{ fontSize: '36px', fontWeight: '900', margin: '4px 0 16px' }}>
-                  ${expenses.reduce((acc, curr) => acc + curr.amount, 0).toFixed(2)}
+            <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+              <div style={{ marginBottom: '28px' }}>
+                <div className="font-mono-hud" style={{ fontSize: '12px', color: '#10e599', fontWeight: '800', letterSpacing: '2px', marginBottom: '4px' }}>
+                  // GROUP FINANCIAL SETTLEMENT MATRIX
                 </div>
+                <h2 className="font-orbitron" style={{ fontSize: '28px', fontWeight: '900', color: '#fff', letterSpacing: '1px' }}>
+                  WAR CHEST EXPENSE LEDGER
+                </h2>
+                <p style={{ fontSize: '15px', color: '#94a3b8', marginTop: '4px' }}>
+                  Real-time database ledger tracking squad expenditures and debts.
+                </p>
+              </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+              {/* Spend Matrix */}
+              <div className="cyber-card tactical-box" style={{ padding: '32px', border: '1px solid #10e599', marginBottom: '28px', background: 'linear-gradient(135deg, rgba(8,12,22,0.95), rgba(16,229,153,0.08))' }}>
+                <span className="font-mono-hud" style={{ fontSize: '12px', color: '#10e599', letterSpacing: '2px', fontWeight: '800' }}>
+                  TOTAL SQUAD EXPENDITURE LOGGED
+                </span>
+                <div className="font-orbitron" style={{ fontSize: '46px', fontWeight: '900', color: '#fff', margin: '6px 0 20px', textShadow: '0 0 20px rgba(16,229,153,0.4)' }}>
+                  ${expenses.reduce((acc, curr) => acc + curr.amount, 0).toFixed(2)} <span style={{ fontSize: '18px', color: '#64748b' }}>USD</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                   <div>
-                    <div style={{ fontSize: '12px', opacity: 0.8 }}>Elena owes You</div>
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#a7f3d0' }}>+$40.00</div>
+                    <div className="font-mono-hud" style={{ fontSize: '11px', color: '#10e599', fontWeight: '800' }}>OPERATIVE ELENA OWES SQUAD</div>
+                    <div className="font-orbitron" style={{ fontSize: '24px', fontWeight: '900', color: '#10e599' }}>+$40.00 <span style={{ fontSize: '12px', color: '#64748b' }}>USD</span></div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '12px', opacity: 0.8 }}>You owe Marcus</div>
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#fde047' }}>-$15.00</div>
+                    <div className="font-mono-hud" style={{ fontSize: '11px', color: '#ff8c00', fontWeight: '800' }}>YOUR NET BALANCE</div>
+                    <div className="font-orbitron" style={{ fontSize: '24px', fontWeight: '900', color: '#ff8c00' }}>+$65.00 <span style={{ fontSize: '12px', color: '#64748b' }}>USD</span></div>
                   </div>
                 </div>
               </div>
 
               {/* Add Expense Form */}
-              <form onSubmit={handleAddExpense} style={{ backgroundColor: '#1e293b', padding: '20px', borderRadius: '16px', marginBottom: '24px', display: 'flex', gap: '12px' }}>
+              <form onSubmit={handleAddExpense} className="cyber-card" style={{ padding: '24px', borderRadius: '12px', marginBottom: '28px', display: 'flex', gap: '14px', flexWrap: 'wrap', border: '1px solid rgba(255, 107, 0, 0.3)' }}>
                 <input
                   type="text"
-                  placeholder="Expense Title (e.g. Villa Deposit)"
+                  placeholder="EXPENDITURE TITLE (E.G. BASECAMP VILLA DEPOSIT)"
                   value={newExpense.title}
                   onChange={(e) => setNewExpense({...newExpense, title: e.target.value})}
-                  style={{ flex: 1, padding: '10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#fff', fontSize: '13px' }}
+                  className="font-mono-hud"
+                  style={{ flex: 1, minWidth: '240px', padding: '12px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '13px' }}
                 />
                 <input
                   type="number"
-                  placeholder="Amount ($)"
+                  placeholder="AMOUNT ($USD)"
                   value={newExpense.amount}
                   onChange={(e) => setNewExpense({...newExpense, amount: e.target.value})}
-                  style={{ width: '120px', padding: '10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#fff', fontSize: '13px' }}
+                  className="font-mono-hud"
+                  style={{ width: '160px', padding: '12px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '13px' }}
                 />
-                <button type="submit" style={{ padding: '10px 20px', backgroundColor: '#f97316', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
-                  + Add Bill
+                <button
+                  type="submit"
+                  className="tactical-btn font-orbitron"
+                  style={{ padding: '12px 28px', backgroundColor: '#ff6b00', color: '#fff', border: 'none', fontWeight: '900', fontSize: '13px', cursor: 'pointer', boxShadow: '0 0 15px rgba(255, 107, 0, 0.5)' }}
+                >
+                  + LOG EXPENDITURE
                 </button>
               </form>
 
-              {/* Expense List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* Ledger Items */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {expenses.map(exp => (
-                  <div key={exp.id} style={{ backgroundColor: '#1e293b', padding: '16px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div key={exp.id} className="cyber-card" style={{ padding: '18px 24px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <div style={{ fontWeight: '800', color: '#fff', fontSize: '15px' }}>{exp.title}</div>
-                      <div style={{ fontSize: '12px', color: '#94a3b8' }}>Paid by {exp.paidBy}</div>
+                      <div className="font-orbitron" style={{ fontSize: '16px', fontWeight: '800', color: '#fff' }}>{exp.title}</div>
+                      <div className="font-mono-hud" style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>PAID BY: {exp.paidBy}</div>
                     </div>
-                    <div style={{ fontSize: '18px', fontWeight: '900', color: '#10b981' }}>
+                    <div className="font-orbitron" style={{ fontSize: '20px', fontWeight: '900', color: '#10e599' }}>
                       ${exp.amount.toFixed(2)}
                     </div>
                   </div>
@@ -840,36 +1285,83 @@ export default function App() {
             </div>
           )}
 
-          {/* ==================== MODULE 5: SOCIAL FEED ==================== */}
+          {/* ==================== MODULE 5: COMMUNICATIONS FEED ==================== */}
           {activeTab === 'social' && (
-            <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#fff', marginBottom: '24px' }}>Travel Community Feed</h2>
+            <div style={{ maxWidth: '750px', margin: '0 auto' }}>
+              <div style={{ marginBottom: '28px' }}>
+                <div className="font-mono-hud" style={{ fontSize: '12px', color: '#ff1355', fontWeight: '800', letterSpacing: '2px', marginBottom: '4px' }}>
+                  // SECURE SQUAD BROADCAST CHANNEL
+                </div>
+                <h2 className="font-orbitron" style={{ fontSize: '28px', fontWeight: '900', color: '#fff', letterSpacing: '1px' }}>
+                  EXPEDITION FIELD TRANSMISSIONS
+                </h2>
+              </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* Create Post Form */}
+              <form onSubmit={handleCreatePost} className="cyber-card" style={{ padding: '20px', borderRadius: '8px', marginBottom: '28px', border: '1px solid rgba(255, 19, 85, 0.3)' }}>
+                <textarea
+                  placeholder="TRANSMIT FIELD INTEL OR MISSION LOG..."
+                  value={newPostCaption}
+                  onChange={(e) => setNewPostCaption(e.target.value)}
+                  className="font-mono-hud"
+                  style={{ width: '100%', height: '80px', padding: '12px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '13px', resize: 'none' }}
+                />
+                <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                  <input
+                    type="text"
+                    placeholder="OPTIONAL PHOTO URL (OR LEAVE BLANK FOR DEFAULT COVER)"
+                    value={newPostImage}
+                    onChange={(e) => setNewPostImage(e.target.value)}
+                    className="font-mono-hud"
+                    style={{ flex: 1, padding: '10px 12px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                  />
+                  <button
+                    type="submit"
+                    className="tactical-btn font-orbitron"
+                    style={{ padding: '10px 24px', backgroundColor: '#ff1355', color: '#fff', border: 'none', fontWeight: '900', fontSize: '12px', cursor: 'pointer' }}
+                  >
+                    TRANSMIT OPS
+                  </button>
+                </div>
+              </form>
+
+              {/* Feed Posts */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                 {posts.map(post => (
-                  <div key={post.id} style={{ backgroundColor: '#1e293b', borderRadius: '20px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <div style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <img src={post.avatar} alt={post.author} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                      <div>
-                        <div style={{ fontWeight: '800', color: '#fff', fontSize: '14px' }}>{post.author}</div>
-                        <div style={{ fontSize: '12px', color: '#f97316' }}>{post.location}</div>
+                  <div key={post.id} className="cyber-card tactical-box" style={{ overflow: 'hidden' }}>
+                    <div style={{ padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <img src={post.avatar} alt="Author" style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'cover', border: '2px solid #ff1355' }} />
+                        <div>
+                          <div className="font-orbitron" style={{ fontSize: '15px', fontWeight: '900', color: '#fff' }}>
+                            {post.author} <span className="font-mono-hud" style={{ fontSize: '11px', color: '#ff8c00' }}>[{post.callsign || 'OPERATIVE'}]</span>
+                          </div>
+                          <div className="font-mono-hud" style={{ fontSize: '11px', color: '#64748b' }}>{post.location}</div>
+                        </div>
                       </div>
+                      <span className="font-mono-hud" style={{ fontSize: '10px', padding: '4px 10px', backgroundColor: 'rgba(255, 19, 85, 0.15)', border: '1px solid #ff1355', color: '#ff1355', borderRadius: '4px', fontWeight: '900' }}>
+                        {post.threatLevel || 'FIELD LOG'}
+                      </span>
                     </div>
 
-                    <img src={post.image} alt="Post" style={{ width: '100%', height: '320px', objectFit: 'cover' }} />
+                    <img src={post.image} alt="Capture" style={{ width: '100%', height: '360px', objectFit: 'cover' }} />
 
-                    <div style={{ padding: '16px' }}>
-                      <p style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '12px' }}>{post.caption}</p>
-                      
-                      <div style={{ display: 'flex', gap: '16px', borderTop: '1px solid #334155', paddingTop: '12px' }}>
+                    <div style={{ padding: '20px 24px' }}>
+                      <p style={{ fontSize: '15px', color: '#cbd5e1', lineHeight: '1.6' }}>{post.caption}</p>
+                      <div style={{ display: 'flex', gap: '20px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                         <button
                           onClick={() => {
-                            setPosts(posts.map(p => p.id === post.id ? {...p, likes: p.isLiked ? p.likes - 1 : p.likes + 1, isLiked: !p.isLiked} : p));
+                            Database.togglePostLike(post.id);
+                            reloadData();
                           }}
-                          style={{ background: 'none', border: 'none', color: post.isLiked ? '#ef4444' : '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', fontSize: '13px' }}
+                          className="font-orbitron"
+                          style={{ background: 'none', border: 'none', color: post.isLiked ? '#ff1355' : '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', fontSize: '13px' }}
                         >
-                          <Heart size={18} fill={post.isLiked ? '#ef4444' : 'none'} /> {post.likes} Likes
+                          <Flame size={20} fill={post.isLiked ? '#ff1355' : 'none'} /> {post.likes} SALUTES
                         </button>
+                        <div className="font-mono-hud" style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                          <MessageSquare size={16} /> {post.comments} COMMS LOGS
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -878,49 +1370,118 @@ export default function App() {
             </div>
           )}
 
-          {/* ==================== MODULE 6: SAFETY HUB ==================== */}
+          {/* ==================== MODULE 6: DEFENSE & SHIELD HUB ==================== */}
           {activeTab === 'safety' && (
-            <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#fff', marginBottom: '6px' }}>Safety & Verification Center</h2>
-              <p style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '24px' }}>Identity verification, women-only filters, and emergency contacts.</p>
+            <div style={{ maxWidth: '850px', margin: '0 auto' }}>
+              <div style={{ marginBottom: '28px' }}>
+                <div className="font-mono-hud" style={{ fontSize: '12px', color: '#ff1355', fontWeight: '800', letterSpacing: '2px', marginBottom: '4px' }}>
+                  // DEFENSE PROTOCOLS & DISTRESS BEACONS
+                </div>
+                <h2 className="font-orbitron" style={{ fontSize: '28px', fontWeight: '900', color: '#fff', letterSpacing: '1px' }}>
+                  SHIELD & BIOMETRIC VERIFICATION
+                </h2>
+              </div>
 
-              <div style={{ backgroundColor: '#1e293b', borderRadius: '16px', padding: '24px', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-                  <CheckCircle2 size={32} color="#10b981" />
+              <div className="cyber-card tactical-box glow-crimson" style={{ padding: '28px', border: '1px solid #10e599', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                  <ShieldCheck size={48} color="#10e599" />
                   <div>
-                    <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#fff' }}>Government ID Status: VERIFIED</h3>
-                    <p style={{ fontSize: '13px', color: '#94a3b8' }}>Passport & Phone OTP verified on August 2026.</p>
+                    <h3 className="font-orbitron" style={{ fontSize: '20px', fontWeight: '900', color: '#fff' }}>
+                      BIOMETRIC IDENTITY: {currentUser.isVerified ? '100% VERIFIED' : 'PENDING VERIFICATION'}
+                    </h3>
+                    <p className="font-mono-hud" style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
+                      Cryptographic government credential verification status linked to database.
+                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* Emergency Contacts */}
-              <div style={{ backgroundColor: '#1e293b', borderRadius: '16px', padding: '24px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#fff', marginBottom: '16px' }}>Emergency Contacts Roster</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ padding: '12px', backgroundColor: '#0f172a', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: '700', color: '#fff', fontSize: '14px' }}>Mom (Family Contact)</div>
-                      <div style={{ fontSize: '12px', color: '#94a3b8' }}>+1 555-0192-834</div>
-                    </div>
-                    <span style={{ fontSize: '12px', color: '#10b981', fontWeight: '700' }}>FCM Push Ready</span>
-                  </div>
-                </div>
+              <div className="cyber-card tactical-box" style={{ padding: '32px', border: '1px solid #ff1355', marginBottom: '28px', background: 'linear-gradient(135deg, rgba(255,19,85,0.1), rgba(5,7,14,0.95))' }}>
+                <h3 className="font-orbitron" style={{ fontSize: '22px', fontWeight: '900', color: '#ff1355', marginBottom: '8px' }}>
+                  ONE-TOUCH EMERGENCY SATELLITE SOS OVERRIDE
+                </h3>
+                <p style={{ color: '#cbd5e1', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>
+                  Instantly transmits high-priority distress signals with live GPS telemetry, terrain altitude, and audio beacon directly to Supreme Overwatch Command.
+                </p>
+                <button
+                  onClick={handleTriggerSos}
+                  className="tactical-btn font-orbitron"
+                  style={{
+                    width: '100%',
+                    padding: '18px',
+                    backgroundColor: '#ff1355',
+                    color: '#fff',
+                    border: 'none',
+                    fontWeight: '900',
+                    fontSize: '15px',
+                    cursor: 'pointer',
+                    boxShadow: '0 0 30px #ff1355',
+                    letterSpacing: '2px'
+                  }}
+                >
+                  <AlertTriangle size={20} style={{ display: 'inline', marginRight: '10px' }} />
+                  TRANSMIT IMMEDIATE DISTRESS BEACON
+                </button>
               </div>
             </div>
           )}
 
-          {/* ==================== MODULE 7: MY PROFILE ==================== */}
+          {/* ==================== MODULE 7: NOMAD PROFILE ==================== */}
           {activeTab === 'profile' && (
-            <div style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
-              <img src={currentUser.photo} alt={currentUser.name} style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', border: '4px solid #2196f3', marginBottom: '16px' }} />
-              <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#fff' }}>{currentUser.name}</h2>
-              <p style={{ fontSize: '14px', color: '#f97316', fontWeight: '700', marginTop: '4px' }}>★ {currentUser.trustScore} Trust Score • {currentUser.tripsCompleted} Trips Completed</p>
-              <p style={{ fontSize: '14px', color: '#cbd5e1', marginTop: '12px' }}>{currentUser.bio}</p>
+            <div style={{ maxWidth: '750px', margin: '0 auto', textAlign: 'center' }}>
+              <div className="cyber-card tactical-box glow-crimson" style={{ padding: '40px', border: '1px solid #ff1355' }}>
+                <div style={{ position: 'relative', display: 'inline-block', marginBottom: '20px' }}>
+                  <img src={currentUser.photo} alt="User" style={{ width: '120px', height: '120px', borderRadius: '16px', objectFit: 'cover', border: '3px solid #ff1355', boxShadow: '0 0 25px rgba(255,19,85,0.6)' }} />
+                  <span className="font-mono-hud" style={{ position: 'absolute', bottom: -10, left: '50%', transform: 'translateX(-50%)', padding: '2px 10px', backgroundColor: currentUser.isVerified ? '#10e599' : '#64748b', color: '#000', borderRadius: '4px', fontSize: '10px', fontWeight: '900' }}>
+                    {currentUser.isVerified ? 'VERIFIED' : 'UNVERIFIED'}
+                  </span>
+                </div>
 
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '24px', flexWrap: 'wrap' }}>
-                <span style={{ padding: '6px 14px', backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '20px', fontSize: '12px', color: '#60a5fa', fontWeight: '700' }}>Style: {currentUser.style}</span>
-                <span style={{ padding: '6px 14px', backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '20px', fontSize: '12px', color: '#f97316', fontWeight: '700' }}>Tier: {currentUser.budget}</span>
+                <div className="font-mono-hud" style={{ fontSize: '12px', color: '#ff8c00', fontWeight: '800', letterSpacing: '2px' }}>
+                  CALLSIGN: {currentUser.callsign} • ROLE: {currentUser.role?.toUpperCase()}
+                </div>
+                <h2 className="font-orbitron" style={{ fontSize: '28px', fontWeight: '900', color: '#fff', marginTop: '4px' }}>
+                  {currentUser.name}
+                </h2>
+                <div className="font-mono-hud" style={{ fontSize: '13px', color: '#ff1355', fontWeight: '800', marginTop: '4px' }}>
+                  ★ {currentUser.trustScore} TRUST SCORE // {currentUser.expeditionsCompleted} EXPEDITIONS LOGGED
+                </div>
+
+                <p style={{ fontSize: '15px', color: '#cbd5e1', marginTop: '16px', lineHeight: '1.6', maxWidth: '540px', margin: '16px auto 0' }}>
+                  "{currentUser.bio}"
+                </p>
+
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '24px', flexWrap: 'wrap' }}>
+                  <span className="font-mono-hud" style={{ padding: '6px 14px', backgroundColor: '#05070e', border: '1px solid #ff1355', borderRadius: '4px', fontSize: '12px', color: '#fff', fontWeight: '800' }}>
+                    STYLE: {currentUser.style}
+                  </span>
+                  <span className="font-mono-hud" style={{ padding: '6px 14px', backgroundColor: '#05070e', border: '1px solid #ff6b00', borderRadius: '4px', fontSize: '12px', color: '#fff', fontWeight: '800' }}>
+                    TIER: {currentUser.budgetTier}
+                  </span>
+                  <span className="font-mono-hud" style={{ padding: '6px 14px', backgroundColor: '#05070e', border: '1px solid #10e599', borderRadius: '4px', fontSize: '12px', color: '#fff', fontWeight: '800' }}>
+                    CLEARANCE: {currentUser.clearanceLevel || 'APEX OPERATIVE'}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => setShowProfileEditModal(true)}
+                  className="tactical-btn font-orbitron"
+                  style={{
+                    marginTop: '28px',
+                    padding: '12px 32px',
+                    backgroundColor: '#ff1355',
+                    color: '#fff',
+                    border: 'none',
+                    fontWeight: '900',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    boxShadow: '0 0 20px #ff1355'
+                  }}
+                >
+                  <Edit3 size={16} style={{ display: 'inline', marginRight: '8px' }} />
+                  EDIT MY PROFILE
+                </button>
+
               </div>
             </div>
           )}
@@ -928,69 +1489,329 @@ export default function App() {
         </main>
       </div>
 
-      {/* CREATE TRIP MODAL */}
+      {/* ══════════════════ AUTH & LOGIN MODAL (USER & ADMIN) ══════════════════ */}
+      {showAuthModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(5, 7, 14, 0.92)', backdropFilter: 'blur(16px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div className="cyber-card tactical-box glow-crimson" style={{ padding: '36px', width: '520px', border: '1px solid #ff1355' }}>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <div className="font-mono-hud" style={{ fontSize: '11px', color: '#ff1355', fontWeight: '800', letterSpacing: '2px' }}>
+                  // APEX IDENTITY GATEWAY
+                </div>
+                <h3 className="font-orbitron" style={{ fontSize: '22px', fontWeight: '900', color: '#fff' }}>
+                  {authMode === 'login' ? 'OPERATIVE IDENTIFICATION' : 'NEW SQUAD ENLISTMENT'}
+                </h3>
+              </div>
+              <button onClick={() => setShowAuthModal(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}>
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* 1-Click Quick Role Switchers */}
+            <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: 'rgba(5,7,14,0.8)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <div className="font-mono-hud" style={{ fontSize: '11px', color: '#ff8c00', fontWeight: '800', marginBottom: '10px' }}>
+                ⚡ 1-CLICK INSTANT DEMO SWITCHER
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => handleQuickLogin('admin')}
+                  className="tactical-btn font-orbitron"
+                  style={{ flex: 1, padding: '10px', backgroundColor: '#ff1355', color: '#fff', border: 'none', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}
+                >
+                  🛡️ AS ADMIN (OVERWATCH)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickLogin('user')}
+                  className="tactical-btn font-orbitron"
+                  style={{ flex: 1, padding: '10px', backgroundColor: '#ff6b00', color: '#fff', border: 'none', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}
+                >
+                  ⚡ AS USER (SARAH)
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleAuthSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {authMode === 'register' && (
+                <>
+                  <input
+                    type="text"
+                    placeholder="FULL OPERATIVE NAME"
+                    value={authForm.name}
+                    onChange={(e) => setAuthForm({ ...authForm, name: e.target.value })}
+                    className="font-mono-hud"
+                    style={{ padding: '12px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '13px' }}
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="TACTICAL CALLSIGN (E.G. VIPER)"
+                    value={authForm.callsign}
+                    onChange={(e) => setAuthForm({ ...authForm, callsign: e.target.value })}
+                    className="font-mono-hud"
+                    style={{ padding: '12px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '13px' }}
+                  />
+                </>
+              )}
+
+              <input
+                type="text"
+                placeholder={authMode === 'login' ? "EMAIL OR CALLSIGN (E.G. admin@apex.io OR VALKYRIE)" : "EMAIL ADDRESS"}
+                value={authMode === 'login' ? authForm.emailOrCallsign : authForm.email}
+                onChange={(e) => authMode === 'login' ? setAuthForm({ ...authForm, emailOrCallsign: e.target.value }) : setAuthForm({ ...authForm, email: e.target.value })}
+                className="font-mono-hud"
+                style={{ padding: '12px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '13px' }}
+                required
+              />
+
+              <input
+                type="password"
+                placeholder="AUTHENTICATION PASSWORD"
+                value={authForm.password}
+                onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                className="font-mono-hud"
+                style={{ padding: '12px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '13px' }}
+                required
+              />
+
+              <button
+                type="submit"
+                className="tactical-btn font-orbitron"
+                style={{
+                  marginTop: '10px',
+                  padding: '14px',
+                  backgroundColor: '#ff1355',
+                  color: '#fff',
+                  border: 'none',
+                  fontWeight: '900',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  boxShadow: '0 0 20px #ff1355'
+                }}
+              >
+                {authMode === 'login' ? 'TRANSMIT IDENTIFICATION' : 'ENLIST NEW OPERATIVE'}
+              </button>
+            </form>
+
+            <div style={{ marginTop: '16px', textAlign: 'center' }}>
+              <button
+                onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+                className="font-mono-hud"
+                style={{ background: 'none', border: 'none', color: '#ff8c00', fontSize: '12px', cursor: 'pointer', fontWeight: '800' }}
+              >
+                {authMode === 'login' ? "NEED NEW ENLISTMENT? CREATE OPERATIVE ACCOUNT" : "ALREADY ENLISTED? SWITCH TO SIGN IN"}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════ USER EDIT PROFILE MODAL ══════════════════ */}
+      {showProfileEditModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(5, 7, 14, 0.92)', backdropFilter: 'blur(16px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div className="cyber-card tactical-box glow-crimson" style={{ padding: '36px', width: '560px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #ff1355' }}>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <div className="font-mono-hud" style={{ fontSize: '11px', color: '#ff6b00', fontWeight: '800', letterSpacing: '2px' }}>
+                  // PROFILE PROTOCOL CUSTOMIZATION
+                </div>
+                <h3 className="font-orbitron" style={{ fontSize: '22px', fontWeight: '900', color: '#fff' }}>
+                  EDIT NOMAD PASSPORT PROFILE
+                </h3>
+              </div>
+              <button onClick={() => setShowProfileEditModal(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}>
+                <X size={24} />
+              </button>
+            </div>
+
+            <form onSubmit={handleProfileUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label className="font-mono-hud" style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>OPERATIVE FULL NAME</label>
+                  <input
+                    type="text"
+                    value={profileForm.name}
+                    onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                    className="font-mono-hud"
+                    style={{ width: '100%', padding: '10px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '13px' }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="font-mono-hud" style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>TACTICAL CALLSIGN</label>
+                  <input
+                    type="text"
+                    value={profileForm.callsign}
+                    onChange={(e) => setProfileForm({ ...profileForm, callsign: e.target.value.toUpperCase() })}
+                    className="font-mono-hud"
+                    style={{ width: '100%', padding: '10px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#ff8c00', fontSize: '13px', fontWeight: '800' }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-mono-hud" style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>AVATAR PHOTO URL</label>
+                <input
+                  type="text"
+                  value={profileForm.photo}
+                  onChange={(e) => setProfileForm({ ...profileForm, photo: e.target.value })}
+                  className="font-mono-hud"
+                  style={{ width: '100%', padding: '10px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                />
+              </div>
+
+              <div>
+                <label className="font-mono-hud" style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>NOMAD INTEL / BIO</label>
+                <textarea
+                  value={profileForm.bio}
+                  onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })}
+                  className="font-mono-hud"
+                  style={{ width: '100%', height: '70px', padding: '10px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '12px', resize: 'none' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label className="font-mono-hud" style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>EXPEDITION STYLE</label>
+                  <input
+                    type="text"
+                    value={profileForm.style}
+                    onChange={(e) => setProfileForm({ ...profileForm, style: e.target.value })}
+                    className="font-mono-hud"
+                    style={{ width: '100%', padding: '10px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '13px' }}
+                  />
+                </div>
+                <div>
+                  <label className="font-mono-hud" style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>BUDGET TIER</label>
+                  <input
+                    type="text"
+                    value={profileForm.budgetTier}
+                    onChange={(e) => setProfileForm({ ...profileForm, budgetTier: e.target.value })}
+                    className="font-mono-hud"
+                    style={{ width: '100%', padding: '10px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '13px' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowProfileEditModal(false)}
+                  className="tactical-btn font-orbitron"
+                  style={{ flex: 1, padding: '12px', backgroundColor: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', fontWeight: '800', cursor: 'pointer' }}
+                >
+                  ABORT
+                </button>
+                <button
+                  type="submit"
+                  className="tactical-btn font-orbitron"
+                  style={{ flex: 1, padding: '12px', backgroundColor: '#ff1355', color: '#fff', border: 'none', fontWeight: '900', cursor: 'pointer', boxShadow: '0 0 20px #ff1355' }}
+                >
+                  SAVE PROFILE
+                </button>
+              </div>
+
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════ HOST EXPEDITION MODAL ══════════════════ */}
       {showCreateTripModal && (
         <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0, 0, 0, 0.75)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(5, 7, 14, 0.88)', backdropFilter: 'blur(12px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
         }}>
-          <div style={{ backgroundColor: '#1e293b', borderRadius: '24px', padding: '32px', width: '440px', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#fff', marginBottom: '16px' }}>Host New Trip Plan</h3>
+          <div className="cyber-card tactical-box glow-crimson" style={{ padding: '36px', width: '500px', border: '1px solid #ff1355' }}>
+            
+            <div className="font-mono-hud" style={{ fontSize: '12px', color: '#ff1355', fontWeight: '800', letterSpacing: '2px', marginBottom: '4px' }}>
+              // EXPEDITION DEPLOYMENT PROTOCOL
+            </div>
+            <h3 className="font-orbitron" style={{ fontSize: '22px', fontWeight: '900', color: '#fff', marginBottom: '20px' }}>
+              HOST NEW TACTICAL EXPEDITION
+            </h3>
             
             <form onSubmit={handleCreateTrip} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <input
                 type="text"
-                placeholder="Trip Title (e.g. Paris Summer Tour)"
+                placeholder="MISSION TITLE (E.G. ICELAND GLACIER ICE-CAVE ASSAULT)"
                 value={newTripForm.title}
                 onChange={(e) => setNewTripForm({...newTripForm, title: e.target.value})}
-                style={{ padding: '12px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '10px', color: '#fff', fontSize: '14px' }}
+                className="font-mono-hud"
+                style={{ padding: '12px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '13px' }}
+                required
               />
               <input
                 type="text"
-                placeholder="Destination City & Country"
+                placeholder="TARGET DESTINATION (E.G. REYKJAVIK, ICELAND)"
                 value={newTripForm.destination}
                 onChange={(e) => setNewTripForm({...newTripForm, destination: e.target.value})}
-                style={{ padding: '12px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '10px', color: '#fff', fontSize: '14px' }}
+                className="font-mono-hud"
+                style={{ padding: '12px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '13px' }}
+                required
               />
               <input
                 type="number"
-                placeholder="Estimated Budget per Person ($USD)"
+                placeholder="ESTIMATED BOUNTY / BUDGET ($USD)"
                 value={newTripForm.budget}
                 onChange={(e) => setNewTripForm({...newTripForm, budget: e.target.value})}
-                style={{ padding: '12px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '10px', color: '#fff', fontSize: '14px' }}
+                className="font-mono-hud"
+                style={{ padding: '12px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#fff', fontSize: '13px' }}
+                required
               />
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: '#fff', cursor: 'pointer' }}>
+              <select
+                value={newTripForm.risk}
+                onChange={(e) => setNewTripForm({...newTripForm, risk: e.target.value})}
+                className="font-mono-hud"
+                style={{ padding: '12px', backgroundColor: '#05070e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#ff8c00', fontSize: '13px', fontWeight: '800' }}
+              >
+                <option value="LOW">THREAT RATING: LOW</option>
+                <option value="MODERATE">THREAT RATING: MODERATE</option>
+                <option value="HIGH">THREAT RATING: HIGH</option>
+                <option value="EXTREME">THREAT RATING: EXTREME</option>
+              </select>
+
+              <label className="font-mono-hud" style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#fff', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
                   checked={newTripForm.isWomenOnly}
                   onChange={(e) => setNewTripForm({...newTripForm, isWomenOnly: e.target.checked})}
                 />
-                Women-Only Trip
+                RESTRICT SQUAD TO VERIFIED WOMEN OPERATIVES
               </label>
 
-              <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+              <div style={{ display: 'flex', gap: '14px', marginTop: '12px' }}>
                 <button
                   type="button"
                   onClick={() => setShowCreateTripModal(false)}
-                  style={{ flex: 1, padding: '12px', backgroundColor: '#334155', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '700', cursor: 'pointer' }}
+                  className="tactical-btn font-orbitron"
+                  style={{ flex: 1, padding: '12px', backgroundColor: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', fontWeight: '800', cursor: 'pointer' }}
                 >
-                  Cancel
+                  ABORT
                 </button>
                 <button
                   type="submit"
-                  style={{ flex: 1, padding: '12px', backgroundColor: '#2196f3', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '800', cursor: 'pointer' }}
+                  className="tactical-btn font-orbitron"
+                  style={{ flex: 1, padding: '12px', backgroundColor: '#ff1355', color: '#fff', border: 'none', fontWeight: '900', cursor: 'pointer', boxShadow: '0 0 20px #ff1355' }}
                 >
-                  Publish Trip
+                  TRANSMIT MISSION
                 </button>
               </div>
             </form>
