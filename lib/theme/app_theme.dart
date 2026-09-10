@@ -1,73 +1,64 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Brand Colors
-  static const Color primaryBlue = Color(0xFF2196F3);
-  static const Color secondaryOrange = Color(0xFFFF9800);
-  static const Color darkBackground = Color(0xFF12181F);
-  static const Color lightBackground = Color(0xFFF8F9FA);
-  static const Color cardDark = Color(0xFF1E2630);
-  static const Color successGreen = Color(0xFF4CAF50);
-  static const Color errorRed = Color(0xFFF44336);
-  static const Color accentTeal = Color(0xFF00ATC6);
+  // Aggressive / Cyber-Tactical Color Palette
+  static const Color neonCrimson = Color(0xFFFF1355);
+  static const Color electricAmber = Color(0xFFFF6B00);
+  static const Color cyberObsidian = Color(0xFF05070E);
+  static const Color tacticalNavy = Color(0xFF0B0F19);
+  static const Color cardSurface = Color(0xFF111827);
+  static const Color matrixGreen = Color(0xFF10E599);
+  static const Color hazardYellow = Color(0xFFFACC15);
+  static const Color textMuted = Color(0xFF94A3B8);
 
-  static ThemeData lightTheme = ThemeData(
-    useMaterial3: true,
-    brightness: Brightness.light,
-    colorScheme: ColorScheme.light(
-      primary: primaryBlue,
-      secondary: secondaryOrange,
-      background: lightBackground,
-      surface: Colors.white,
-    ),
-    scaffoldBackgroundColor: lightBackground,
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Colors.white,
-      elevation: 0,
-      iconTheme: IconThemeData(color: Colors.black87),
-      titleTextStyle: TextStyle(
-        color: Colors.black87,
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: primaryBlue,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
-        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-      ),
-    ),
-  );
-
-  static ThemeData darkTheme = ThemeData(
+  static ThemeData aggressiveTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    colorScheme: ColorScheme.dark(
-      primary: primaryBlue,
-      secondary: secondaryOrange,
-      background: darkBackground,
-      surface: cardDark,
+    scaffoldBackgroundColor: cyberObsidian,
+    colorScheme: const ColorScheme.dark(
+      primary: neonCrimson,
+      secondary: electricAmber,
+      surface: cardSurface,
+      background: cyberObsidian,
+      onPrimary: Colors.white,
+      onSurface: Color(0xFFF1F5F9),
     ),
-    scaffoldBackgroundColor: darkBackground,
     appBarTheme: const AppBarTheme(
-      backgroundColor: cardDark,
+      backgroundColor: tacticalNavy,
       elevation: 0,
+      centerTitle: false,
       titleTextStyle: TextStyle(
         color: Colors.white,
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
+        fontSize: 18,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 1.5,
+      ),
+      iconTheme: IconThemeData(color: neonCrimson),
+    ),
+    cardTheme: CardTheme(
+      color: cardSurface,
+      elevation: 8,
+      shadowColor: neonCrimson.withOpacity(0.2),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0x33FF1355)),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: secondaryOrange,
-        foregroundColor: Colors.black,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
-        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        backgroundColor: neonCrimson,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        textStyle: const TextStyle(
+          fontWeight: FontWeight.w900,
+          fontSize: 14,
+          letterSpacing: 1.5,
+        ),
+        elevation: 10,
+        shadowColor: neonCrimson.withOpacity(0.6),
       ),
     ),
   );
