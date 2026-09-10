@@ -1,51 +1,172 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@500;700;800;900&display=swap');
 
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: 'Plus Jakarta Sans', sans-serif;
 }
 
 body {
-  background-color: #0f172a;
-  color: #f8fafc;
+  background-color: #05070e;
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(255, 19, 85, 0.12) 0%, transparent 60%),
+    radial-gradient(circle at 85% 60%, rgba(255, 107, 0, 0.08) 0%, transparent 50%),
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+  color: #f1f5f9;
   min-height: 100vh;
+  font-family: 'Rajdhani', sans-serif;
+  letter-spacing: 0.3px;
 }
 
-/* Glassmorphism Styles */
-.glass-panel {
-  background: rgba(30, 41, 59, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+/* Aggressive Cyber Fonts */
+.font-orbitron {
+  font-family: 'Orbitron', monospace;
+  letter-spacing: 1.5px;
 }
 
-.glass-card {
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.font-mono-hud {
+  font-family: 'JetBrains Mono', monospace;
 }
 
-.glass-card:hover {
-  border-color: rgba(33, 150, 243, 0.4);
+/* Tactical Clipped Shapes */
+.tactical-box {
+  clip-path: polygon(
+    0 0, 
+    calc(100% - 16px) 0, 
+    100% 16px, 
+    100% 100%, 
+    16px 100%, 
+    0 calc(100% - 16px)
+  );
+}
+
+.tactical-btn {
+  clip-path: polygon(
+    0 0, 
+    calc(100% - 10px) 0, 
+    100% 10px, 
+    100% 100%, 
+    10px 100%, 
+    0 calc(100% - 10px)
+  );
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tactical-btn:hover {
   transform: translateY(-2px);
-  transition: all 0.2s ease;
+  filter: brightness(1.2);
+}
+
+/* Aggressive Glow Styles */
+.glow-crimson {
+  box-shadow: 0 0 25px rgba(255, 19, 85, 0.45), inset 0 0 15px rgba(255, 19, 85, 0.2);
+}
+
+.glow-amber {
+  box-shadow: 0 0 25px rgba(255, 107, 0, 0.45), inset 0 0 15px rgba(255, 107, 0, 0.2);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 25px rgba(0, 242, 254, 0.4), inset 0 0 15px rgba(0, 242, 254, 0.15);
+}
+
+.border-crimson-glow {
+  border: 1px solid rgba(255, 19, 85, 0.5);
+  box-shadow: 0 0 15px rgba(255, 19, 85, 0.25);
+}
+
+.border-amber-glow {
+  border: 1px solid rgba(255, 107, 0, 0.5);
+  box-shadow: 0 0 15px rgba(255, 107, 0, 0.25);
+}
+
+/* Hazard Stripes */
+.hazard-stripe {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 19, 85, 0.15),
+    rgba(255, 19, 85, 0.15) 10px,
+    transparent 10px,
+    transparent 20px
+  );
+}
+
+.hazard-stripe-amber {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 107, 0, 0.15),
+    rgba(255, 107, 0, 0.15) 10px,
+    transparent 10px,
+    transparent 20px
+  );
+}
+
+/* Cyber Card Surface */
+.cyber-card {
+  background: rgba(11, 15, 25, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cyber-card:hover {
+  border-color: rgba(255, 19, 85, 0.6);
+  box-shadow: 0 12px 32px -8px rgba(255, 19, 85, 0.25);
+  transform: translateY(-4px);
+}
+
+/* Scanline / HUD Overlay */
+.hud-scanline {
+  position: relative;
+}
+
+.hud-scanline::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.3) 51%);
+  background-size: 100% 4px;
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+/* Pulse Beacon */
+@keyframes beaconPulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.6); opacity: 0.3; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.pulse-ring {
+  position: relative;
+}
+
+.pulse-ring::before {
+  content: "";
+  position: absolute;
+  top: -2px; left: -2px; right: -2px; bottom: -2px;
+  border-radius: inherit;
+  background: inherit;
+  animation: beaconPulse 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+  z-index: -1;
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #05070e;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 4px;
+  background: #ff1355;
+  border-radius: 2px;
+  box-shadow: 0 0 10px #ff1355;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #ff6b00;
 }
