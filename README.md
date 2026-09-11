@@ -1,221 +1,169 @@
-# ?? Travel Buddy Finder App (Full Stack MERN)
+# Travel Buddy Finder App (Full-Stack MERN)
 
-> Safe, social, and admin-governed travel companion platform  
-> Built with **React 18 + Vite (Frontend)** and **Node.js + Express + MongoDB + JWT (Backend)**.
+[![Stack](https://img.shields.io/badge/Stack-MERN-blue.svg)](https://react.dev/)
+[![Node.js](https://img.shields.io/badge/Node.js-v18+-green.svg)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express.js-4.x-lightgrey.svg)](https://expressjs.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-brightgreen.svg)](https://www.mongodb.com/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
----
-
-## ?? Table of Contents
-
-1. [Project Overview](#-project-overview)
-2. [Tech Stack](#-tech-stack)
-3. [Project File Structure](#-project-file-structure)
-4. [Backend Architecture & API Endpoints](#-backend-architecture--api-endpoints)
-5. [Database Models (MongoDB)](#-database-models-mongodb)
-6. [Security Architecture](#-security-architecture)
-7. [Step-by-Step Setup & How to Run](#-step-by-step-setup--how-to-run)
-8. [Configuring MongoDB](#-configuring-mongodb)
-9. [Admin Credentials](#-admin-credentials)
+> A full-stack travel companion and squad finder web application designed for group trip planning, budget tracking, real-time community messaging, and administrative safety governance.
 
 ---
 
-## ?? Project Overview
+## Features Overview
 
-Travel Buddy Finder is a full-stack platform designed to connect travelers safely and coordinate group expeditions:
+### Traveler Portal
+* **Explore Approved Trips**: Search and filter admin-approved travel expeditions by destination, budget, or women-only preferences.
+* **Host & Submit Expeditions**: Create custom travel itineraries; submitted trips are queued for admin review before public publishing.
+* **Buddy Matcher**: Interactive profile matching to connect with compatible travel companions.
+* **Direct Messenger**: Real-time 1-on-1 messaging between travelers as well as a direct line to System Admin Support.
+* **Trip Expense Splitter**: Track shared expenditures and manage group balances transparently.
+* **Community Travel Feed**: Share travel photos, stories, and like posts from fellow travelers.
+* **Emergency SOS Dispatch**: One-click emergency SOS alerting with live GPS coordinate dispatch and emergency contact details.
 
-- **Travelers** can explore admin-approved trips, match with travel buddies, plan itineraries, track expenses, post travel updates, chat with admin, and dispatch emergency SOS alerts.
-- **Admins** have an isolated control console to review and approve/reject trips, send activity guidance via chat, govern user accounts (suspend/verify/delete), and monitor SOS emergencies.
+### Admin Governance Console
+* **Isolated Control Center**: Dedicated administrative interface isolated from regular user views.
+* **Trip Approvals Queue**: Moderation workflow to review, approve, or reject host trip requests before publishing.
+* **User Governance**: Suspend/Activate accounts, toggle verified badges, or permanently remove users violating community rules.
+* **Support & Guidance Messaging**: Direct communication channel with travelers to offer official travel advisories and safety guidance.
+* **Emergency SOS Monitor**: Real-time alert monitor with active/resolved status tracking.
+* **Content Moderation**: Review public community posts and delete inappropriate content.
 
 ---
 
-## ?? Tech Stack
+## Tech Stack & Architecture
 
 ### Frontend
 - **Framework**: React 18 (JSX)
 - **Build Tool**: Vite 5
 - **Icons**: Lucide React
-- **Client Networking**: Centralized `fetch` API Client with JWT Bearer auth
-- **Port**: `http://localhost:5173`
+- **Client Networking**: Centralized HTTP API Client wrapping `fetch` requests with JWT Bearer Headers
+- **Dev Server Port**: `5173` (Proxies `/api` to Express backend)
 
 ### Backend
 - **Runtime**: Node.js
 - **Framework**: Express.js
 - **Database**: MongoDB (via Mongoose ODM)
-- **Authentication**: JWT (JSON Web Tokens) + bcryptjs (12 salt rounds)
-- **Port**: `http://localhost:5000`
+- **Security**: JWT (JSON Web Tokens) for stateless auth + `bcryptjs` (12 rounds) for password hashing
+- **Port**: `5000`
 
 ---
 
-## ?? Project File Structure
+## Project Directory Structure
 
-```
-Travel Buddy Finder App/
-¦
-+-- server/                          ? ?? Node.js + Express + MongoDB Backend
-¦   +-- server.js                    ? Express server entry point & admin seeder
-¦   +-- package.json                 ? Backend dependencies
-¦   +-- .env                         ? MongoDB URI, JWT Secret, Port
+```text
+Travel-Buddy-Finder-App/
++-- server/                          # Express + MongoDB Backend
 ¦   +-- middleware/
-¦   ¦   +-- auth.js                  ? JWT protect & adminOnly guards
+¦   ¦   +-- auth.js                  # JWT protect & adminOnly guards
 ¦   +-- models/
-¦   ¦   +-- User.js                  ? User schema with bcrypt pre-save hook
-¦   ¦   +-- Trip.js                  ? Trip schema (PENDING/APPROVED status)
-¦   ¦   +-- Expense.js               ? Shared expenses schema
-¦   ¦   +-- Post.js                  ? Community photo feed schema
-¦   ¦   +-- ItineraryItem.js         ? Shared itinerary and voting schema
-¦   ¦   +-- SosAlert.js              ? Emergency SOS alert schema
-¦   ¦   +-- ChatMessage.js           ? Admin ? User guidance chat schema
+¦   ¦   +-- User.js                  # User schema with bcrypt pre-save hook
+¦   ¦   +-- Trip.js                  # Trip schema (PENDING/APPROVED status)
+¦   ¦   +-- Expense.js               # Shared expenses schema
+¦   ¦   +-- Post.js                  # Community photo feed schema
+¦   ¦   +-- ItineraryItem.js         # Group itinerary and voting schema
+¦   ¦   +-- SosAlert.js              # Emergency SOS alert schema
+¦   ¦   +-- ChatMessage.js           # Direct messaging schema
 ¦   +-- routes/
-¦       +-- auth.js                  ? /api/auth (register, login, me)
-¦       +-- trips.js                 ? /api/trips (CRUD + approve/reject)
-¦       +-- users.js                 ? /api/users (CRUD + status/verify)
-¦       +-- expenses.js              ? /api/expenses (CRUD)
-¦       +-- posts.js                 ? /api/posts (CRUD + likes)
-¦       +-- itinerary.js             ? /api/itinerary (CRUD + upvoting)
-¦       +-- sos.js                   ? /api/sos (trigger + resolve)
-¦       +-- chat.js                  ? /api/chat (send & retrieve threads)
+¦   ¦   +-- auth.js                  # Authentication routes (/api/auth)
+¦   ¦   +-- trips.js                 # Expedition management (/api/trips)
+¦   ¦   +-- users.js                 # User governance (/api/users)
+¦   ¦   +-- expenses.js              # Expense tracking (/api/expenses)
+¦   ¦   +-- posts.js                 # Social feed (/api/posts)
+¦   ¦   +-- itinerary.js             # Activity planner (/api/itinerary)
+¦   ¦   +-- sos.js                   # Emergency SOS (/api/sos)
+¦   ¦   +-- chat.js                  # Direct messaging (/api/chat)
+¦   +-- .env.example                 # Environment variables template
+¦   +-- server.js                    # Express application entry & auto-seeder
+¦   +-- package.json                 # Backend dependencies
 ¦
-+-- src/                             ? ?? React Frontend
++-- src/                             # React Frontend
 ¦   +-- api/
-¦   ¦   +-- client.js                ? API Client wrapping all HTTP requests
-¦   +-- App.jsx                      ? Main Application UI & Workflow
-¦   +-- main.jsx                     ? React Root Mount
-¦   +-- index.css                    ? Global Styles
+¦   ¦   +-- client.js                # Centralized API client wrapping fetch calls
+¦   +-- App.jsx                      # Main React application & workspace views
+¦   +-- main.jsx                     # Application root entry
+¦   +-- index.css                    # Global application styles
 ¦
-+-- vite.config.js                   ? Vite dev server & /api proxy configuration
-+-- package.json                     ? Frontend dependencies & scripts
-+-- README.md                        ? Complete documentation
-+-- dist/                            ? Production build directory
++-- vite.config.js                   # Vite configuration with API proxy
++-- package.json                     # Frontend dependencies & scripts
++-- README.md                        # Project documentation
 ```
 
 ---
 
-## ?? Backend Architecture & API Endpoints
+## API Endpoints Reference
 
 All protected endpoints require the header `Authorization: Bearer <jwt_token>`.
 
-### ?? Auth (`/api/auth`)
+### Authentication (`/api/auth`)
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
-| `POST` | `/api/auth/register` | Public | Register new user, returns JWT & user object |
-| `POST` | `/api/auth/login` | Public | Login with email/callsign & password |
-| `GET` | `/api/auth/me` | Protected | Fetch current user profile from token |
+| `POST` | `/api/auth/register` | Public | Register new traveler account, returns JWT & user object |
+| `POST` | `/api/auth/login` | Public | Authenticate via email, username, or admin callsign |
+| `GET` | `/api/auth/me` | Protected | Verify active JWT session and return profile |
 
-### ?? Trips (`/api/trips`)
+### Trips (`/api/trips`)
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
-| `GET` | `/api/trips` | User | Get all APPROVED trips (supports `search` & `womenOnly` queries) |
+| `GET` | `/api/trips` | User | Get all APPROVED trips (supports search & womenOnly filtering) |
 | `GET` | `/api/trips/pending` | Admin | Get all PENDING trip submissions |
-| `GET` | `/api/trips/all` | Admin | Get all trips in the database |
-| `GET` | `/api/trips/mine` | User | Get current user's submitted trips |
-| `POST` | `/api/trips` | User | Create a trip (defaults to `PENDING` approval) |
-| `PATCH`| `/api/trips/:id/approve` | Admin | Approve trip for public feed |
-| `PATCH`| `/api/trips/:id/reject` | Admin | Reject & remove trip |
-| `DELETE`| `/api/trips/:id` | Admin | Delete any trip |
-
-### ?? Users (`/api/users`)
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| `GET` | `/api/users` | Admin | Get all registered users |
-| `GET` | `/api/users/travelers` | User | Get active users for buddy matching |
-| `PATCH`| `/api/users/:id` | User/Admin | Update user profile |
-| `PATCH`| `/api/users/:id/status` | Admin | Suspend or Activate user account |
-| `PATCH`| `/api/users/:id/verify` | Admin | Toggle verified badge |
-| `DELETE`| `/api/users/:id` | Admin | Delete user account |
-
-### ?? Chat, SOS, Social, Expenses & Itinerary
-- **Chat (`/api/chat`)**: Send messages between travelers and admin, view message history.
-- **SOS (`/api/sos`)**: Dispatch emergency alerts with live coordinates and contact info; admin can mark alerts resolved.
-- **Posts (`/api/posts`)**: Post travel stories, like posts, delete posts.
-- **Expenses (`/api/expenses`)**: Record shared expenses, calculate per-person budget splits.
-- **Itinerary (`/api/itinerary`)**: Add activities, vote on group activities.
+| `GET` | `/api/trips/all` | Admin | Get all platform trips |
+| `POST` | `/api/trips` | User | Submit trip (defaults to `PENDING` status) |
+| `PATCH`| `/api/trips/:id/approve` | Admin | Approve pending trip request |
+| `PATCH`| `/api/trips/:id/reject` | Admin | Reject and delete trip request |
+| `DELETE`| `/api/trips/:id` | Admin | Permanently delete live trip |
 
 ---
 
-## ??? Security Architecture
+## Getting Started & Local Setup
 
-1. **Password Hashing (bcrypt)**:
-   - Passwords are salt-hashed (12 rounds) on the backend before writing to MongoDB.
-   - Plaintext passwords are never saved or returned in API responses.
-2. **Stateless JWT Authentication**:
-   - On successful login, the server issues a signed JWT token valid for 7 days.
-   - Token is verified on each API request by the `protect` middleware.
-3. **Role-Based Access Control (RBAC)**:
-   - Admin-only routes are secured with `adminOnly` middleware verifying `req.user.role === 'admin'`.
-4. **Admin Protection**:
-   - The master admin account cannot be suspended or deleted.
-5. **CORS & Input Validation**:
-   - CORS is restricted to frontend development origins.
-   - User inputs are trimmed and validated on the backend.
+### 1. Repository Setup & Dependencies
+```bash
+# Clone repository
+git clone https://github.com/your-username/Travel-Buddy-Finder-App.git
+cd Travel-Buddy-Finder-App
 
----
-
-## ?? Step-by-Step Setup & How to Run
-
-### 1. Install Dependencies
-In the project root folder:
-```powershell
-# Install frontend packages
+# Install frontend dependencies
 npm install
 
-# Install backend packages
+# Install backend dependencies
 cd server
 npm install
 cd ..
 ```
 
-### 2. Configure MongoDB
-Open `server/.env` and verify the `MONGO_URI`. (See [Configuring MongoDB](#-configuring-mongodb) below).
-
-### 3. Start the Backend Server
-In one terminal window:
-```powershell
-npm run server
-# or: cd server && npm start
-```
-*Backend runs at `http://localhost:5000`*
-
-### 4. Start the Frontend Dev Server
-In a second terminal window:
-```powershell
-npm run dev
-```
-*Frontend runs at `http://localhost:5173`*
-
----
-
-## ?? Configuring MongoDB
-
-You can connect to **MongoDB Atlas (Free Cloud Database)** or a **Local MongoDB instance**:
-
-### Option A: MongoDB Atlas (Recommended - No installation required)
-1. Create a free account at [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas).
-2. Create a free **M0 Shared Cluster**.
-3. Under **Database Access**, create a user (e.g., `appUser` and password).
-4. Under **Network Access**, add IP `0.0.0.0/0` (Allow Access from Anywhere).
-5. Click **Connect** ? **Drivers** ? Copy your connection string.
-6. Paste it into [`server/.env`](file:///c:/Users/ASUS/OneDrive/Desktop/Travel%20Buddy%20Finder%20App/server/.env):
-   ```env
-   MONGO_URI=mongodb+srv://<username>:<password>@cluster0.abcde.mongodb.net/travel_buddy_finder?retryWrites=true&w=majority
-   ```
-
-### Option B: Local MongoDB
-If you install [MongoDB Community Server](https://www.mongodb.com/try/download/community) locally:
+### 2. Environment Configuration
+Create a `.env` file inside the `server/` directory (you can copy `server/.env.example`):
 ```env
 MONGO_URI=mongodb://127.0.0.1:27017/travel_buddy_finder
+JWT_SECRET=your_super_secret_jwt_key
+JWT_EXPIRES_IN=7d
+PORT=5000
+CLIENT_URL=http://localhost:5173
 ```
 
+### 3. Launching Application
+In terminal 1 (Backend Server):
+```bash
+npm run server
+```
+
+In terminal 2 (Frontend React App):
+```bash
+npm run dev
+```
+
+Visit `http://localhost:5173` in your browser.
+
 ---
 
-## ?? Admin Credentials
+## Default Master Admin Credentials
 
-The backend automatically creates the initial Master Admin account on first startup:
-
-| Field | Value |
-|---|---|
-| **Email / Callsign** | `admin@travelbuddy.com` (or simply `admin`) |
-| **Password** | `admin123` |
+The backend automatically seeds a master admin account on initial startup:
+* **Email / Callsign**: `admin@travelbuddy.com` (or `admin`)
+* **Password**: `admin123`
 
 ---
 
-<p align="center">Travel Buddy Finder • Built with React, Node.js, Express & MongoDB</p>
+## License
+Distributed under the MIT License. See `LICENSE` for details.
