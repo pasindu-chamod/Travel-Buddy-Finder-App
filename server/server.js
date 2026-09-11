@@ -62,7 +62,7 @@ app.use((err, req, res, next) => {
 });
 
 // ─── MONGODB + SERVER STARTUP ─────────────────────────────
-async function seedAdminAccount() {
+async function seedInitialData() {
   try {
     const User = require('./models/User');
     const adminExists = await User.findOne({ role: 'admin' });
@@ -83,8 +83,39 @@ async function seedAdminAccount() {
     } else {
       console.log('ℹ️  Admin account already exists.');
     }
+
+    const travelersCount = await User.countDocuments({ role: 'user' });
+    if (travelersCount < 2) {
+      await User.create([
+        {
+          name: 'Sahan Perera',
+          email: 'sahan@travelbuddy.com',
+          password: 'user123',
+          role: 'user',
+          status: 'ACTIVE',
+          phone: '+94 77 123 4567',
+          bio: 'Backpacker & Mountain Hiker. Always looking for new adventures!',
+          isVerified: true,
+          homeCountry: 'Sri Lanka',
+          style: 'Backpacking & Nature'
+        },
+        {
+          name: 'Amaya Silva',
+          email: 'amaya@travelbuddy.com',
+          password: 'user123',
+          role: 'user',
+          status: 'ACTIVE',
+          phone: '+94 71 987 6543',
+          bio: 'Coastal Explorer & Culture lover. Planning beach trips!',
+          isVerified: true,
+          homeCountry: 'Sri Lanka',
+          style: 'Beach & Culture'
+        }
+      ]);
+      console.log('✅ Demo travelers seeded: Sahan Perera & Amaya Silva');
+    }
   } catch (err) {
-    console.error('❌ Failed to seed admin:', err.message);
+    console.error('❌ Failed to seed initial data:', err.message);
   }
 }
 
@@ -97,8 +128,8 @@ async function startServer() {
     });
     console.log('✅ MongoDB connected:', mongoose.connection.host);
 
-    // Seed admin on first run
-    await seedAdminAccount();
+    // Seed initial admin and demo travelers on first run
+    await seedInitialData();
 
     app.listen(PORT, () => {
       console.log('');
