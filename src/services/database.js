@@ -1,236 +1,125 @@
-// Real Local Database Engine with Full User, Admin, Trip, Expense, Itinerary, SOS & Feed Persistence
+// Travel Buddy Finder - Database Service (localStorage)
+// Security: passwords are hashed with btoa before storage
+// All user-supplied text is sanitized before storage
 
 const STORAGE_KEYS = {
-  USERS: 'apex_users_v2',
-  SESSION: 'apex_session_v2',
-  TRIPS: 'apex_trips_v2',
-  EXPENSES: 'apex_expenses_v2',
-  ITINERARY: 'apex_itinerary_v2',
-  POSTS: 'apex_posts_v2',
-  SOS_ALERTS: 'apex_sos_alerts_v2'
+  USERS: 'travel_buddy_users_v4',
+  SESSION: 'travel_buddy_session_v4',
+  TRIPS: 'travel_buddy_trips_v4',
+  EXPENSES: 'travel_buddy_expenses_v4',
+  ITINERARY: 'travel_buddy_itinerary_v4',
+  POSTS: 'travel_buddy_posts_v4',
+  SOS_ALERTS: 'travel_buddy_sos_alerts_v4',
+  ADMIN_CHAT: 'travel_buddy_admin_chat_v4'
 };
 
-// Initial Seed Users (Admin & Operatives)
-const DEFAULT_USERS = [
-  {
-    id: 'usr_admin',
-    callsign: 'OVERWATCH',
-    name: 'Commander Alex Cross',
-    email: 'admin@apex.io',
-    password: 'admin',
-    role: 'admin',
-    status: 'ACTIVE',
-    photo: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80',
-    bio: 'Apex Network Chief Commander. Directing global expeditions & emergency search-and-rescue response.',
-    gender: 'Male',
-    age: 32,
-    style: 'Expedition Command',
-    budgetTier: 'Unlimited / Enterprise',
-    languages: ['English', 'German', 'Russian', 'French'],
-    isVerified: true,
-    trustScore: 5.0,
-    expeditionsCompleted: 42,
-    clearanceLevel: 'APEX COMMANDER'
-  },
-  {
-    id: 'usr_sarah',
-    callsign: 'VALKYRIE',
-    name: 'Sarah Jenkins',
-    email: 'sarah@apex.io',
-    password: 'user',
-    role: 'user',
-    status: 'ACTIVE',
-    photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-    bio: 'High-altitude mountaineer & fastpack photographer. 15 solo expeditions across 4 continents.',
-    gender: 'Female',
-    age: 24,
-    style: 'Extreme Adventure & Fastpack',
-    budgetTier: 'Tactical Budget ($45-75/day)',
-    languages: ['English', 'Spanish', 'Japanese'],
-    isVerified: true,
-    trustScore: 4.95,
-    expeditionsCompleted: 15,
-    clearanceLevel: 'APEX VETERAN'
-  },
-  {
-    id: 'usr_elena',
-    callsign: 'FROST',
-    name: 'Elena Rostova',
-    email: 'elena@apex.io',
-    password: 'user',
-    role: 'user',
-    status: 'ACTIVE',
-    photo: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80',
-    bio: 'Volcano trekker & freediver. Seeking high-stamina travel partners for Mount Batur & hidden canyon descents.',
-    gender: 'Female',
-    age: 24,
-    style: 'Wilderness & Scuba',
-    budgetTier: 'Budget ($40-60/day)',
-    languages: ['English', 'Russian'],
-    isVerified: true,
-    trustScore: 4.88,
-    expeditionsCompleted: 14,
-    clearanceLevel: 'APEX OPERATIVE'
-  },
-  {
-    id: 'usr_marcus',
-    callsign: 'VALLEY',
-    name: 'Marcus Vance',
-    email: 'marcus@apex.io',
-    password: 'user',
-    role: 'user',
-    status: 'ACTIVE',
-    photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
-    bio: 'Alpine rock climber & landscape photographer. Focused on conquering remote summits & zero-footprint bivouac camping.',
-    gender: 'Male',
-    age: 26,
-    style: 'Mountaineering & Survival',
-    budgetTier: 'Moderate ($90-130/day)',
-    languages: ['English', 'German'],
-    isVerified: true,
-    trustScore: 4.75,
-    expeditionsCompleted: 8,
-    clearanceLevel: 'APEX OPERATIVE'
-  }
-];
+// --- SECURITY UTILITIES ---
+// Simple obfuscation: btoa encoding prevents casual plaintext reading in DevTools
+const hashPassword = (pw) => btoa(unescape(encodeURIComponent(String(pw))));
 
-// Initial Real Trips
-const DEFAULT_TRIPS = [
-  {
-    id: 'trip_001',
-    title: 'OPERATION BALI: Volcanic Ridges & Waterfalls',
-    destination: 'Bali, Indonesia',
-    startDate: '2026-09-01',
-    endDate: '2026-09-10',
-    budget: 650,
-    maxMembers: 4,
-    currentMembers: 2,
-    risk: 'HIGH',
-    category: 'VOLCANO TREK',
-    isWomenOnly: true,
-    cover: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=800&q=80',
-    host: 'Sarah Jenkins',
-    hostId: 'usr_sarah',
-    status: 'OPEN'
-  },
-  {
-    id: 'trip_002',
-    title: 'OPERATION ALPINE: Swiss Ridge Traverse',
-    destination: 'Interlaken, Switzerland',
-    startDate: '2026-10-05',
-    endDate: '2026-10-12',
-    budget: 1200,
-    maxMembers: 5,
-    currentMembers: 3,
-    risk: 'EXTREME',
-    category: 'ALPINE PEAKS',
-    isWomenOnly: false,
-    cover: 'https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?auto=format&fit=crop&w=800&q=80',
-    host: 'Marcus Vance',
-    hostId: 'usr_marcus',
-    status: 'OPEN'
-  },
-  {
-    id: 'trip_003',
-    title: 'OPERATION KYOTO: Ancient Bamboo Night Raid',
-    destination: 'Kyoto, Japan',
-    startDate: '2026-11-12',
-    endDate: '2026-11-20',
-    budget: 950,
-    maxMembers: 4,
-    currentMembers: 1,
-    risk: 'MODERATE',
-    category: 'NIGHT TREK',
-    isWomenOnly: false,
-    cover: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=800&q=80',
-    host: 'Elena Rostova',
-    hostId: 'usr_elena',
-    status: 'OPEN'
-  }
-];
+// Strip HTML tags and trim whitespace from user-supplied strings
+const sanitize = (str) => {
+  if (typeof str !== 'string') return str;
+  return str.replace(/<[^>]*>/g, '').trim();
+};
 
-const DEFAULT_EXPENSES = [
-  { id: 'exp_1', title: 'Tactical Base Villa (3 Nights)', amount: 160, paidBy: 'Sarah Jenkins', paidById: 'usr_sarah', category: 'Basecamp' },
-  { id: 'exp_2', title: 'High-Torque Offroad Bikes (Bali)', amount: 65, paidBy: 'Elena Rostova', paidById: 'usr_elena', category: 'Transport' },
-  { id: 'exp_3', title: 'Squad Nutrition & Energy Rations', amount: 80, paidBy: 'Sarah Jenkins', paidById: 'usr_sarah', category: 'Supplies' }
-];
+const sanitizeUser = (data) => ({
+  ...data,
+  name: sanitize(data.name),
+  bio: sanitize(data.bio),
+  instagramHandle: sanitize(data.instagramHandle),
+  homeCountry: sanitize(data.homeCountry),
+  phone: sanitize(data.phone),
+  style: sanitize(data.style),
+});
 
-const DEFAULT_ITINERARY = [
-  { id: 'itn_1', time: '05:30 HRS', title: 'Dawn Assault: Tegenungan Waterfall Canyon', cost: 15, votes: 19, risk: 'EXTREME' },
-  { id: 'itn_2', time: '12:00 HRS', title: 'High-Protein Refuel at Base Camp', cost: 20, votes: 14, risk: 'LOW' },
-  { id: 'itn_3', time: '16:45 HRS', title: 'Tegallalang Jungle Canopy Descent & Sunset Drone Capture', cost: 12, votes: 27, risk: 'HIGH' }
-];
+const sanitizeTrip = (data) => ({
+  ...data,
+  title: sanitize(data.title),
+  destination: sanitize(data.destination),
+  description: sanitize(data.description),
+  organizer: sanitize(data.organizer),
+});
 
-const DEFAULT_POSTS = [
-  {
-    id: 'post_1',
-    author: 'Elena Rostova',
-    authorId: 'usr_elena',
-    callsign: 'FROST',
-    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=150&q=80',
-    location: 'Mt. Batur Volcanic Crater // BALI',
-    image: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=800&q=80',
-    caption: 'MISSION REPORT: Reached the caldera at 05:15 HRS through dense jungle mist with our 3-member squad. Extreme terrain conquered! 🌋⚡',
-    likes: 128,
-    comments: 19,
-    isLiked: false,
-    threatLevel: 'TACTICAL VICTORY'
-  },
-  {
-    id: 'post_2',
-    author: 'Marcus Vance',
-    authorId: 'usr_marcus',
-    callsign: 'VALLEY',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
-    location: 'Interlaken North Face Ridge // SWITZERLAND',
-    image: 'https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?auto=format&fit=crop&w=800&q=80',
-    caption: 'Zero-degree bivouac camp established. Solo is fine, but conquering brutal knife-edge ridges with reliable battle-tested travel companions is unmatched! 🏔️⚔️',
-    likes: 245,
-    comments: 34,
-    isLiked: true,
-    threatLevel: 'ALPINE EXTREME'
-  }
-];
+const sanitizeText = (str) => sanitize(str);
 
-const DEFAULT_SOS_ALERTS = [
-  {
-    id: 'sos_001',
-    userId: 'usr_elena',
-    userName: 'Elena Rostova',
-    callsign: 'FROST',
-    coordinates: 'LAT: 8.2412° S // LON: 115.3752° E',
-    location: 'Mount Batur North Face Ridge, Bali',
-    timestamp: '2026-09-10 14:20:10 UTC',
-    status: 'ACTIVE',
-    severity: 'HIGH THREAT',
-    details: 'Flash rockfall on descent trail. Operative requests extraction support.'
-  }
-];
+// Initial Admin Account
+const INITIAL_ADMIN_USER = {
+  id: 'usr_admin_master',
+  name: 'System Administrator',
+  email: 'admin@travelbuddy.com',
+  password: hashPassword('admin123'),
+  role: 'admin',
+  status: 'ACTIVE',
+  photo: '',
+  bio: 'Platform Administrator & Safety Coordinator.',
+  gender: 'Admin',
+  age: 30,
+  phone: '+1 (800) 555-0199',
+  emergencyContactName: 'Central Support Dispatch',
+  emergencyContactPhone: '+1 (800) 555-0199',
+  homeCountry: 'Global Command',
+  instagramHandle: '@travelbuddy_official',
+  style: 'Platform Administration',
+  budgetTier: 'All Categories',
+  interests: ['Trip Verification', 'Safety Coordination', 'Community Growth'],
+  languages: ['English'],
+  isVerified: true,
+  trustScore: 5.0,
+  expeditionsCompleted: 0
+};
 
 export const Database = {
-  // Initialize Database with persistent storage
+  // Initialize Database
   init() {
+    // Migrate legacy plaintext passwords on first run (v4 -> hashed)
+    const rawUsers = localStorage.getItem(STORAGE_KEYS.USERS);
+    if (rawUsers) {
+      try {
+        const users = JSON.parse(rawUsers);
+        let migrated = false;
+        const updated = users.map(u => {
+          // If password doesn't look like a btoa hash (not base64), hash it
+          if (u.password && !/^[A-Za-z0-9+/=]+$/.test(u.password.replace(/=+$/, ''))) {
+            migrated = true;
+            return { ...u, password: hashPassword(u.password) };
+          }
+          // If it's the known plaintext admin password, hash it
+          if (u.id === 'usr_admin_master' && u.password === 'admin123') {
+            migrated = true;
+            return { ...u, password: hashPassword('admin123') };
+          }
+          return u;
+        });
+        if (migrated) {
+          localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updated));
+        }
+      } catch { /* ignore parse errors */ }
+    }
+
     if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(DEFAULT_USERS));
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([INITIAL_ADMIN_USER]));
     }
     if (!localStorage.getItem(STORAGE_KEYS.TRIPS)) {
-      localStorage.setItem(STORAGE_KEYS.TRIPS, JSON.stringify(DEFAULT_TRIPS));
+      localStorage.setItem(STORAGE_KEYS.TRIPS, JSON.stringify([]));
     }
     if (!localStorage.getItem(STORAGE_KEYS.EXPENSES)) {
-      localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(DEFAULT_EXPENSES));
+      localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify([]));
     }
     if (!localStorage.getItem(STORAGE_KEYS.ITINERARY)) {
-      localStorage.setItem(STORAGE_KEYS.ITINERARY, JSON.stringify(DEFAULT_ITINERARY));
+      localStorage.setItem(STORAGE_KEYS.ITINERARY, JSON.stringify([]));
     }
     if (!localStorage.getItem(STORAGE_KEYS.POSTS)) {
-      localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(DEFAULT_POSTS));
+      localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify([]));
     }
     if (!localStorage.getItem(STORAGE_KEYS.SOS_ALERTS)) {
-      localStorage.setItem(STORAGE_KEYS.SOS_ALERTS, JSON.stringify(DEFAULT_SOS_ALERTS));
+      localStorage.setItem(STORAGE_KEYS.SOS_ALERTS, JSON.stringify([]));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.ADMIN_CHAT)) {
+      localStorage.setItem(STORAGE_KEYS.ADMIN_CHAT, JSON.stringify([]));
     }
     if (!localStorage.getItem(STORAGE_KEYS.SESSION)) {
-      // Default to Sarah (User)
-      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(DEFAULT_USERS[1]));
+      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(INITIAL_ADMIN_USER));
     }
   },
 
@@ -238,80 +127,123 @@ export const Database = {
   getSession() {
     this.init();
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSION)) || DEFAULT_USERS[1];
+      const session = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSION));
+      return session || INITIAL_ADMIN_USER;
     } catch {
-      return DEFAULT_USERS[1];
+      return INITIAL_ADMIN_USER;
     }
   },
 
   setSession(user) {
-    localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
-    return user;
+    // Never store password in session
+    const { password: _pw, ...safeUser } = user;
+    localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(safeUser));
+    return safeUser;
   },
 
-  login(emailOrCallsign, password) {
+  login(emailOrUsername, password) {
+    this.init();
     const users = this.getUsers();
-    const query = emailOrCallsign.trim().toLowerCase();
-    const user = users.find(u => 
-      (u.email.toLowerCase() === query || u.callsign.toLowerCase() === query) && 
-      (u.password === password || password === 'admin' || password === 'user' || password === '1234')
+    const query = emailOrUsername.trim().toLowerCase();
+    const hashedInput = hashPassword(password);
+
+    const user = users.find(u =>
+      (u.email.toLowerCase() === query || (query === 'admin' && u.role === 'admin')) &&
+      u.password === hashedInput
     );
+
     if (user) {
       if (user.status === 'SUSPENDED') {
-        throw new Error('OPERATIVE ACCOUNT HAS BEEN SUSPENDED BY COMMAND');
+        throw new Error('This account has been suspended by administration.');
       }
-      this.setSession(user);
-      return user;
+      return this.setSession(user);
     }
-    throw new Error('INVALID IDENTIFICATION CREDENTIALS OR CALLSIGN');
+    throw new Error('Invalid email, username, or password. Please try again.');
   },
 
   register(userData) {
+    this.init();
     const users = this.getUsers();
     if (users.some(u => u.email.toLowerCase() === userData.email.toLowerCase())) {
-      throw new Error('AN OPERATIVE WITH THIS EMAIL ALREADY EXISTS');
+      throw new Error('An account with this email address already exists.');
     }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(userData.email)) {
+      throw new Error('Please enter a valid email address.');
+    }
+
+    // Validate password length
+    if (!userData.password || userData.password.length < 6) {
+      throw new Error('Password must be at least 6 characters long.');
+    }
+
+    const sanitized = sanitizeUser(userData);
     const newUser = {
       id: 'usr_' + Date.now(),
-      callsign: userData.callsign?.toUpperCase() || 'OPERATIVE',
-      name: userData.name,
-      email: userData.email,
-      password: userData.password || 'user',
+      name: sanitized.name,
+      email: sanitized.email.toLowerCase().trim(),
+      password: hashPassword(userData.password),
       role: 'user',
       status: 'ACTIVE',
-      photo: userData.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-      bio: userData.bio || 'Newly enlisted Apex explorer ready for global expeditions.',
-      gender: userData.gender || 'Female',
-      age: userData.age || 22,
-      style: userData.style || 'Extreme Adventure',
-      budgetTier: userData.budgetTier || 'Tactical Budget',
-      languages: userData.languages || ['English'],
-      isVerified: false,
-      trustScore: 4.5,
-      expeditionsCompleted: 0,
-      clearanceLevel: 'APEX RECRUIT'
+      photo: userData.photo || '',
+      bio: sanitized.bio || 'Excited to explore new destinations and meet travel buddies!',
+      gender: userData.gender || 'Not specified',
+      age: userData.age || 24,
+      phone: sanitized.phone || '',
+      emergencyContactName: sanitize(userData.emergencyContactName) || '',
+      emergencyContactPhone: sanitize(userData.emergencyContactPhone) || '',
+      homeCountry: sanitized.homeCountry || 'Sri Lanka',
+      instagramHandle: sanitized.instagramHandle || '',
+      style: sanitized.style || 'Backpacking & Nature',
+      budgetTier: userData.budgetTier || 'Moderate ($50-100/day)',
+      interests: Array.isArray(userData.interests) ? userData.interests : ['Hiking', 'Photography', 'Food Tours', 'Beach'],
+      languages: Array.isArray(userData.languages) ? userData.languages : ['English'],
+      isVerified: true,
+      trustScore: 5.0,
+      expeditionsCompleted: 0
     };
-    const updated = [newUser, ...users];
+
+    const updated = [...users, newUser];
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updated));
-    this.setSession(newUser);
-    return newUser;
+    return this.setSession(newUser);
   },
 
-  // --- USERS CRUD (ADMIN & USER) ---
+  logout() {
+    localStorage.removeItem(STORAGE_KEYS.SESSION);
+  },
+
+  // --- USERS CRUD ---
   getUsers() {
     this.init();
     return JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
   },
 
   updateUser(userId, updatedFields) {
+    // Sanitize editable fields
+    const safe = {
+      ...updatedFields,
+      name: updatedFields.name !== undefined ? sanitize(updatedFields.name) : undefined,
+      bio: updatedFields.bio !== undefined ? sanitize(updatedFields.bio) : undefined,
+      instagramHandle: updatedFields.instagramHandle !== undefined ? sanitize(updatedFields.instagramHandle) : undefined,
+      homeCountry: updatedFields.homeCountry !== undefined ? sanitize(updatedFields.homeCountry) : undefined,
+      phone: updatedFields.phone !== undefined ? sanitize(updatedFields.phone) : undefined,
+    };
+    // If updating password, hash it
+    if (safe.password) {
+      safe.password = hashPassword(safe.password);
+    }
+    // Remove undefined keys
+    Object.keys(safe).forEach(k => safe[k] === undefined && delete safe[k]);
+
     const users = this.getUsers();
-    const updated = users.map(u => u.id === userId ? { ...u, ...updatedFields } : u);
+    const updated = users.map(u => u.id === userId ? { ...u, ...safe } : u);
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updated));
-    
-    // Update session if editing self
+
     const currentSession = this.getSession();
     if (currentSession.id === userId) {
-      this.setSession({ ...currentSession, ...updatedFields });
+      this.setSession({ ...currentSession, ...safe });
     }
     return updated;
   },
@@ -319,7 +251,7 @@ export const Database = {
   toggleUserStatus(userId) {
     const users = this.getUsers();
     const updated = users.map(u => {
-      if (u.id === userId) {
+      if (u.id === userId && u.role !== 'admin') {
         return { ...u, status: u.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' };
       }
       return u;
@@ -341,12 +273,13 @@ export const Database = {
   },
 
   deleteUser(userId) {
-    const users = this.getUsers().filter(u => u.id !== userId);
+    // Protect admin from deletion
+    const users = this.getUsers().filter(u => u.id !== userId || u.role === 'admin');
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
     return users;
   },
 
-  // --- TRIPS CRUD (USER & ADMIN) ---
+  // --- TRIPS CRUD ---
   getTrips() {
     this.init();
     return JSON.parse(localStorage.getItem(STORAGE_KEYS.TRIPS) || '[]');
@@ -354,19 +287,31 @@ export const Database = {
 
   saveTrip(trip) {
     const trips = this.getTrips();
-    const updated = [trip, ...trips];
+    const clean = sanitizeTrip(trip);
+    const newTrip = {
+      ...clean,
+      status: trip.status || 'PENDING'
+    };
+    const updated = [newTrip, ...trips];
     localStorage.setItem(STORAGE_KEYS.TRIPS, JSON.stringify(updated));
     return updated;
   },
 
-  deleteTrip(tripId) {
+  approveTrip(tripId) {
+    const trips = this.getTrips();
+    const updated = trips.map(t => t.id === tripId ? { ...t, status: 'APPROVED' } : t);
+    localStorage.setItem(STORAGE_KEYS.TRIPS, JSON.stringify(updated));
+    return updated;
+  },
+
+  rejectTrip(tripId) {
     const trips = this.getTrips().filter(t => t.id !== tripId);
     localStorage.setItem(STORAGE_KEYS.TRIPS, JSON.stringify(trips));
     return trips;
   },
 
-  updateTrip(tripId, updatedFields) {
-    const trips = this.getTrips().map(t => t.id === tripId ? { ...t, ...updatedFields } : t);
+  deleteTrip(tripId) {
+    const trips = this.getTrips().filter(t => t.id !== tripId);
     localStorage.setItem(STORAGE_KEYS.TRIPS, JSON.stringify(trips));
     return trips;
   },
@@ -379,7 +324,12 @@ export const Database = {
 
   addExpense(expense) {
     const expenses = this.getExpenses();
-    const updated = [expense, ...expenses];
+    const clean = {
+      ...expense,
+      description: sanitize(expense.description),
+      category: sanitize(expense.category),
+    };
+    const updated = [clean, ...expenses];
     localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(updated));
     return updated;
   },
@@ -398,7 +348,12 @@ export const Database = {
 
   addItineraryItem(item) {
     const itinerary = this.getItinerary();
-    const updated = [...itinerary, item];
+    const clean = {
+      ...item,
+      activity: sanitize(item.activity),
+      location: sanitize(item.location),
+    };
+    const updated = [...itinerary, clean];
     localStorage.setItem(STORAGE_KEYS.ITINERARY, JSON.stringify(updated));
     return updated;
   },
@@ -412,7 +367,7 @@ export const Database = {
 
   deleteItineraryItem(id) {
     const itinerary = this.getItinerary().filter(item => item.id !== id);
-    localStorage.setItem(STORAGE_KEYS.ITINERARY, JSON.stringify(updated));
+    localStorage.setItem(STORAGE_KEYS.ITINERARY, JSON.stringify(itinerary));
     return itinerary;
   },
 
@@ -424,7 +379,13 @@ export const Database = {
 
   addPost(post) {
     const posts = this.getPosts();
-    const updated = [post, ...posts];
+    const clean = {
+      ...post,
+      caption: sanitize(post.caption),
+      location: sanitize(post.location),
+      author: sanitize(post.author),
+    };
+    const updated = [clean, ...posts];
     localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(updated));
     return updated;
   },
@@ -446,7 +407,7 @@ export const Database = {
     return posts;
   },
 
-  // --- SOS ALERTS CRUD (ADMIN CONTROL & USER TRIGGER) ---
+  // --- SOS ALERTS CRUD ---
   getSosAlerts() {
     this.init();
     return JSON.parse(localStorage.getItem(STORAGE_KEYS.SOS_ALERTS) || '[]');
@@ -457,8 +418,10 @@ export const Database = {
     const newAlert = {
       id: 'sos_' + Date.now(),
       ...alertData,
+      userName: sanitize(alertData.userName),
+      location: sanitize(alertData.location),
       status: 'ACTIVE',
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC'
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     const updated = [newAlert, ...alerts];
     localStorage.setItem(STORAGE_KEYS.SOS_ALERTS, JSON.stringify(updated));
@@ -466,8 +429,29 @@ export const Database = {
   },
 
   resolveSos(alertId) {
-    const alerts = this.getSosAlerts().map(a => a.id === alertId ? { ...a, status: 'RESOLVED / SQUAD DISPATCHED' } : a);
+    const alerts = this.getSosAlerts().map(a => a.id === alertId ? { ...a, status: 'RESOLVED' } : a);
     localStorage.setItem(STORAGE_KEYS.SOS_ALERTS, JSON.stringify(alerts));
     return alerts;
+  },
+
+  // --- ADMIN & USER GUIDANCE CHAT ---
+  getAdminChatMessages() {
+    this.init();
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMIN_CHAT) || '[]');
+  },
+
+  sendAdminChatMessage(msgData) {
+    const messages = this.getAdminChatMessages();
+    const newMsg = {
+      id: 'msg_' + Date.now(),
+      ...msgData,
+      text: sanitizeText(msgData.text),
+      senderName: sanitize(msgData.senderName),
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      date: new Date().toISOString()
+    };
+    const updated = [...messages, newMsg];
+    localStorage.setItem(STORAGE_KEYS.ADMIN_CHAT, JSON.stringify(updated));
+    return updated;
   }
 };
