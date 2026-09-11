@@ -107,6 +107,17 @@ export default function App() {
     setTimeout(() => setToastMessage(''), 3800);
   };
 
+  const resetAuthForm = () => {
+    setAuthForm({
+      emailOrCallsign: '',
+      password: '',
+      name: '',
+      email: '',
+      phone: '',
+      style: 'Backpacking & Nature'
+    });
+  };
+
   // ─── AUTH HANDLERS ───
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
@@ -116,6 +127,7 @@ export default function App() {
         setCurrentUser(user);
         setProfileForm({ ...user });
         setShowAuthModal(false);
+        resetAuthForm();
         triggerToast(`👋 Welcome back, ${user.name}!`);
         if (user.role === 'admin') setAdminTab('dashboard');
         else setUserTab('explore');
@@ -131,6 +143,7 @@ export default function App() {
         setCurrentUser(newUser);
         setProfileForm({ ...newUser });
         setShowAuthModal(false);
+        resetAuthForm();
         triggerToast(`🎉 Account created! Welcome, ${newUser.name}`);
         setUserTab('explore');
       }
@@ -150,6 +163,7 @@ export default function App() {
     setPosts([]);
     setSosAlerts([]);
     setAdminChatMessages([]);
+    resetAuthForm();
     setShowAuthModal(true);
     triggerToast('Logged out successfully.');
   };
@@ -242,35 +256,37 @@ export default function App() {
     } catch (err) { alert(err.message); }
   };
 
-  // ─── CHAT MESSAGING (USER <-> ADMIN GUIDANCE) ───
+  // ─── CHAT MESSAGING (USER <-> ADMIN & USER <-> USER) ───
   const handleSendChatMessage = async (e) => {
     if (e) e.preventDefault();
     if (!chatInputText.trim()) return;
 
-    const targetUserId = currentUser.role === 'admin' ? selectedChatUserId : null;
-    if (currentUser.role === 'admin' && !selectedChatUserId) {
-      alert('Please select a user thread to send guidance to.');
-      return;
+    let targetUserId = selectedChatUserId;
+
+    if (currentUser.role === 'admin') {
+      if (!targetUserId && chatUsersList.length > 0) {
+        targetUserId = chatUsersList[0]._id || chatUsersList[0].id;
+        setSelectedChatUserId(targetUserId);
+      }
+      if (!targetUserId) {
+        alert('Please select a traveler thread from the left menu.');
+        return;
+      }
+    } else {
+      if (!targetUserId) {
+        targetUserId = 'admin';
+        setSelectedChatUserId('admin');
+      }
     }
 
     try {
       await api.sendChatMessage(chatInputText.trim(), targetUserId);
       setChatInputText('');
-      triggerToast(currentUser.role === 'admin' ? '📢 Activity guidance sent to user!' : '💬 Message sent to Admin!');
+      triggerToast('💬 Message sent successfully!');
       reloadData();
-    } catch (err) { alert(err.message); }
-  };
-
-  const handleSendGuidancePreset = async (presetText) => {
-    if (!selectedChatUserId) {
-      alert('Please select a user thread first.');
-      return;
+    } catch (err) {
+      alert(err.message);
     }
-    try {
-      await api.sendChatMessage(presetText, selectedChatUserId);
-      triggerToast('📋 Official Guidance Sent!');
-      reloadData();
-    } catch (err) { alert(err.message); }
   };
 
   // ─── USER ACTIONS ───
@@ -388,24 +404,68 @@ export default function App() {
     if (currentUser) reloadData();
   }, [currentUser?.role]);
   
-  // Set default selected chat user for Admin if not set
+  // Set default selected chat user for Admin and Travelers
   useEffect(() => {
-    if (currentUser?.role === 'admin' && !selectedChatUserId && chatUsersList.length > 0) {
-      setSelectedChatUserId(chatUsersList[0]._id || chatUsersList[0].id);
+    if (currentUser?.role === 'admin') {
+      if (!selectedChatUserId && chatUsersList.length > 0) {
+        setSelectedChatUserId((chatUsersList[0]._id || chatUsersList[0].id)?.toString());
+      }
+    } else {
+      if (!selectedChatUserId) {
+        setSelectedChatUserId('admin');
+      }
     }
   }, [allUsers, currentUser?.role]);
 
   // Messages for currently active thread
-  const uid = currentUser?._id || currentUser?.id;
-  const activeThreadUserId = currentUser?.role === 'admin' ? selectedChatUserId : uid;
-  const currentThreadMessages = adminChatMessages.filter(m =>
-    m.userId === activeThreadUserId || m.userId?.toString() === activeThreadUserId?.toString()
-  );
+  const uid = (currentUser?._id || currentUser?.id)?.toString();
+
+  // Active contact details
+  const activeContact = currentUser?.role === 'admin'
+    ? allUsers.find(u => (u._id || u.id)?.toString() === selectedChatUserId?.toString()) || chatUsersList[0]
+    : selectedChatUserId === 'admin' || !selectedChatUserId
+      ? { name: 'System Administrator', role: 'admin', bio: 'Platform Safety & Guidance' }
+      : allUsers.find(u => (u._id || u.id)?.toString() === selectedChatUserId?.toString());
+
+  const currentThreadMessages = adminChatMessages.filter(m => {
+    const sId = (m.senderId?._id || m.senderId)?.toString();
+    const rId = (m.recipientId?._id || m.recipientId)?.toString();
+    const mUserId = (m.userId?._id || m.userId)?.toString();
+
+    if (currentUser?.role === 'admin') {
+      const targetId = (selectedChatUserId || chatUsersList[0]?._id || chatUsersList[0]?.id)?.toString();
+      return (
+        m.conversationKey === `admin_${targetId}` ||
+        sId === targetId ||
+        rId === targetId ||
+        mUserId === targetId
+      );
+    } else {
+      if (!selectedChatUserId || selectedChatUserId === 'admin') {
+        // Conversation with Admin
+        return (
+          m.conversationKey === `admin_${uid}` ||
+          (sId === uid && (!rId || m.recipientName === 'System Administrator')) ||
+          (rId === uid && m.senderRole === 'admin') ||
+          mUserId === uid
+        );
+      } else {
+        // Direct conversation with another traveler
+        const targetId = selectedChatUserId?.toString();
+        const expectedKey = [uid, targetId].sort().join('_');
+        return (
+          m.conversationKey === expectedKey ||
+          (sId === uid && rId === targetId) ||
+          (sId === targetId && rId === uid)
+        );
+      }
+    }
+  });
 
   // Candidates for Matching
   const otherUsers = allUsers.filter(u => {
-    const uUid = u._id || u.id;
-    return uUid?.toString() !== uid?.toString() && u.role !== 'admin';
+    const uUid = (u._id || u.id)?.toString();
+    return uUid !== uid && u.role !== 'admin';
   });
   const activeCandidate = otherUsers[currentMatchIndex % (otherUsers.length || 1)];
 
@@ -519,7 +579,10 @@ export default function App() {
 
           <div style={{ marginTop: '18px', textAlign: 'center' }}>
             <button
-              onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+              onClick={() => {
+                resetAuthForm();
+                setAuthMode(authMode === 'login' ? 'register' : 'login');
+              }}
               style={{ background: 'none', border: 'none', color: '#60a5fa', fontSize: '12px', cursor: 'pointer', fontWeight: '600' }}
             >
               {authMode === 'login' ? "Don't have an account? Create one" : "Already have an account? Sign In"}
@@ -607,7 +670,7 @@ export default function App() {
               }}
             >
               <MessageSquarePlus size={15} />
-              Chat with Admin
+              Messages & Chat
             </button>
           )}
 
@@ -804,7 +867,7 @@ export default function App() {
               {[
                 { id: 'explore', label: 'Explore Trips', icon: Compass, badge: `${publicApprovedTrips.length}` },
                 { id: 'match', label: 'Buddy Matcher', icon: Heart, badge: `${otherUsers.length}` },
-                { id: 'chat', label: 'Admin Chat & Support', icon: MessageSquarePlus, badge: 'Live Guidance' },
+                { id: 'chat', label: 'Messenger & Support', icon: MessageSquarePlus, badge: 'Direct Chat' },
                 { id: 'planner', label: 'Trip Itinerary', icon: Calendar, badge: `${itinerary.length}` },
                 { id: 'expense', label: 'Expense Splitter', icon: DollarSign, badge: `$${expenses.reduce((a,c)=>a+c.amount,0)}` },
                 { id: 'social', label: 'Travel Feed', icon: MessageSquare, badge: `${posts.length}` },
@@ -1074,14 +1137,20 @@ export default function App() {
                         <div style={{ fontSize: '12px', color: '#64748b', padding: '12px 0' }}>No travelers registered yet.</div>
                       ) : (
                         chatUsersList.map(u => {
-                          const isSelected = selectedChatUserId === u.id;
-                          const userMsgs = adminChatMessages.filter(m => m.userId === u.id);
+                          const uId = (u._id || u.id)?.toString();
+                          const isSelected = selectedChatUserId?.toString() === uId;
+                          const userMsgs = adminChatMessages.filter(m => 
+                            m.conversationKey === `admin_${uId}` ||
+                            (m.senderId?._id || m.senderId)?.toString() === uId ||
+                            (m.recipientId?._id || m.recipientId)?.toString() === uId ||
+                            (m.userId?._id || m.userId)?.toString() === uId
+                          );
                           const lastMsg = userMsgs[userMsgs.length - 1];
 
                           return (
                             <button
-                              key={u.id}
-                              onClick={() => setSelectedChatUserId(u.id)}
+                              key={uId}
+                              onClick={() => setSelectedChatUserId(uId)}
                               style={{
                                 padding: '12px',
                                 backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'rgba(15, 23, 42, 0.6)',
@@ -1095,12 +1164,12 @@ export default function App() {
                               }}
                             >
                               <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700', color: '#fff' }}>
-                                {u.name.charAt(0)}
+                                {u.name ? u.name.charAt(0).toUpperCase() : 'U'}
                               </div>
                               <div style={{ flex: 1, overflow: 'hidden' }}>
                                 <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>{u.name}</div>
                                 <div style={{ fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {lastMsg ? `${lastMsg.senderRole === 'admin' ? 'You: ' : ''}${lastMsg.text}` : 'Start conversation...'}
+                                  {lastMsg ? `${(lastMsg.senderId?._id || lastMsg.senderId)?.toString() === uid ? 'You: ' : ''}${lastMsg.text}` : 'Start conversation...'}
                                 </div>
                               </div>
                             </button>
@@ -1109,36 +1178,23 @@ export default function App() {
                       )}
                     </div>
 
-                    {/* Chat Messages & Guidance Panel */}
+                    {/* Chat Messages Panel */}
                     <div className="travel-card" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
                       
                       {/* Thread Header */}
                       <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.8)' }}>
-                        <div>
-                          <div style={{ fontSize: '15px', fontWeight: '700', color: '#fff' }}>
-                            Conversation with: <span style={{ color: '#38bdf8' }}>{allUsers.find(u => u.id === selectedChatUserId)?.name || 'Select a Traveler'}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700', color: '#fff' }}>
+                            {activeContact?.name ? activeContact.name.charAt(0).toUpperCase() : 'T'}
                           </div>
-                          <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                            Official System Guidance & Support Thread
+                          <div>
+                            <div style={{ fontSize: '15px', fontWeight: '700', color: '#fff' }}>
+                              {activeContact?.name || 'Select a Traveler'}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                              {activeContact?.email || 'Direct Traveler Support Channel'}
+                            </div>
                           </div>
-                        </div>
-
-                        {/* Quick Activity Guidance Presets for Admin */}
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleSendGuidancePreset('📋 OFFICIAL ADVISORY: Please make sure your travel group adheres to local environmental guidelines and verified safety protocols.')}
-                            style={{ padding: '5px 10px', backgroundColor: 'rgba(59, 130, 246, 0.15)', border: '1px solid #3b82f6', color: '#60a5fa', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
-                          >
-                            + Safety Guidance
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSendGuidancePreset('✅ VERIFICATION NOTICE: Your account & profile information are in order. You are clear to host trips.')}
-                            style={{ padding: '5px 10px', backgroundColor: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', color: '#34d399', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
-                          >
-                            + Verification Advice
-                          </button>
                         </div>
                       </div>
 
@@ -1146,27 +1202,27 @@ export default function App() {
                       <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: '#0f172a' }}>
                         {currentThreadMessages.length === 0 ? (
                           <div style={{ margin: 'auto', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>
-                            No messages in this guidance thread yet. Type a message or send guidance below!
+                            No messages in this conversation yet. Send a message below!
                           </div>
                         ) : (
-                          currentThreadMessages.map(msg => {
-                            const isAdmin = msg.senderRole === 'admin';
+                          currentThreadMessages.map((msg, index) => {
+                            const isMe = (msg.senderId?._id || msg.senderId)?.toString() === uid || msg.senderRole === 'admin';
                             return (
                               <div
-                                key={msg.id}
+                                key={msg._id || msg.id || index}
                                 style={{
-                                  alignSelf: isAdmin ? 'flex-end' : 'flex-start',
+                                  alignSelf: isMe ? 'flex-end' : 'flex-start',
                                   maxWidth: '75%',
-                                  backgroundColor: isAdmin ? '#2563eb' : 'rgba(30, 41, 59, 0.9)',
+                                  backgroundColor: isMe ? '#2563eb' : 'rgba(30, 41, 59, 0.9)',
                                   color: '#fff',
                                   padding: '12px 16px',
-                                  borderRadius: isAdmin ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                                  borderRadius: isMe ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
                                   boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                                  border: isAdmin ? 'none' : '1px solid rgba(255,255,255,0.08)'
+                                  border: isMe ? 'none' : '1px solid rgba(255,255,255,0.08)'
                                 }}
                               >
                                 <div style={{ fontSize: '11px', opacity: 0.8, marginBottom: '4px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  {isAdmin ? <Shield size={12} /> : null} {msg.senderName} ({msg.timestamp})
+                                  {isMe ? <Shield size={12} /> : null} {msg.senderName} ({msg.timestamp || 'Just now'})
                                 </div>
                                 <div style={{ fontSize: '13px', lineHeight: '1.5' }}>
                                   {msg.text}
@@ -1181,7 +1237,7 @@ export default function App() {
                       <form onSubmit={handleSendChatMessage} style={{ padding: '14px 18px', backgroundColor: '#1e293b', borderTop: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', gap: '10px' }}>
                         <input
                           type="text"
-                          placeholder="Type official guidance or response to traveler..."
+                          placeholder="Type your message..."
                           value={chatInputText}
                           onChange={(e) => setChatInputText(e.target.value)}
                           style={{ flex: 1, padding: '10px 14px', backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff', fontSize: '13px' }}
@@ -1191,7 +1247,7 @@ export default function App() {
                           className="btn-primary"
                           style={{ padding: '10px 20px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                         >
-                          <Send size={15} /> Send Guidance
+                          <Send size={15} /> Send
                         </button>
                       </form>
 
@@ -1517,89 +1573,186 @@ export default function App() {
           {currentUser.role !== 'admin' && (
             <div>
               
-              {/* ==================== MODULE: TRAVELER CHAT WITH ADMIN ==================== */}
+              {/* ==================== MODULE: TRAVELER DIRECT CHAT & ADMIN SUPPORT ==================== */}
               {userTab === 'chat' && (
-                <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+                <div>
                   <div style={{ marginBottom: '20px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#fff', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <MessageSquarePlus size={24} color="#3b82f6" /> Chat with Admin & Activity Guidance 💬
+                      <MessageSquarePlus size={24} color="#3b82f6" /> Messenger & Community Chat 💬
                     </h2>
                     <p style={{ fontSize: '14px', color: '#94a3b8', marginTop: '4px' }}>
-                      Get direct guidance, activity safety tips, trip approval status updates, and support from the System Admin.
+                      Chat directly with other travelers to plan trips or message the Admin for official guidance.
                     </p>
                   </div>
 
-                  <div className="travel-card" style={{ height: '560px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '20px', height: '620px' }}>
                     
-                    {/* Chat Header */}
-                    <div style={{ padding: '16px 20px', backgroundColor: 'rgba(15, 23, 42, 0.8)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Shield size={20} color="#fff" />
+                    {/* Contacts Sidebar (Admin + Other Travelers) */}
+                    <div className="travel-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto' }}>
+                      
+                      <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '4px' }}>
+                        Direct Support
                       </div>
-                      <div>
-                        <div style={{ fontSize: '15px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          Official Admin Support Console <CheckCircle2 size={16} color="#10b981" />
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#38bdf8' }}>
-                          Online • Guiding your travel safety & trip activities
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* Messages Container */}
-                    <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: '#0f172a' }}>
-                      {currentThreadMessages.length === 0 ? (
-                        <div style={{ margin: 'auto', textAlign: 'center', color: '#64748b', fontSize: '13px', maxWidth: '400px' }}>
-                          <Shield size={40} color="#3b82f6" style={{ margin: '0 auto 12px' }} />
-                          <h4 style={{ color: '#fff', fontSize: '15px', fontWeight: '700', marginBottom: '4px' }}>Welcome to Admin Guidance!</h4>
-                          <p style={{ color: '#94a3b8' }}>Have questions about your trip, safety rules, or platform verification? Send a message to the Admin below!</p>
+                      {/* Admin Contact Button */}
+                      <button
+                        onClick={() => setSelectedChatUserId('admin')}
+                        style={{
+                          padding: '12px',
+                          backgroundColor: (!selectedChatUserId || selectedChatUserId === 'admin') ? 'rgba(59, 130, 246, 0.2)' : 'rgba(15, 23, 42, 0.6)',
+                          border: (!selectedChatUserId || selectedChatUserId === 'admin') ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.06)',
+                          borderRadius: '10px',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px'
+                        }}
+                      >
+                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                          <Shield size={18} />
                         </div>
+                        <div style={{ flex: 1, overflow: 'hidden' }}>
+                          <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            Admin Support <CheckCircle2 size={13} color="#10b981" />
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#38bdf8' }}>Official System Support</div>
+                        </div>
+                      </button>
+
+                      <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginTop: '12px', marginBottom: '4px' }}>
+                        Fellow Travelers ({otherUsers.length})
+                      </div>
+
+                      {otherUsers.length === 0 ? (
+                        <div style={{ fontSize: '12px', color: '#64748b', padding: '8px 0' }}>No other travelers registered yet.</div>
                       ) : (
-                        currentThreadMessages.map(msg => {
-                          const isUser = msg.senderRole !== 'admin';
+                        otherUsers.map(u => {
+                          const uId = (u._id || u.id)?.toString();
+                          const isSelected = selectedChatUserId?.toString() === uId;
+                          const expectedKey = [uid, uId].sort().join('_');
+                          const userMsgs = adminChatMessages.filter(m => 
+                            m.conversationKey === expectedKey ||
+                            ((m.senderId?._id || m.senderId)?.toString() === uid && (m.recipientId?._id || m.recipientId)?.toString() === uId) ||
+                            ((m.senderId?._id || m.senderId)?.toString() === uId && (m.recipientId?._id || m.recipientId)?.toString() === uid)
+                          );
+                          const lastMsg = userMsgs[userMsgs.length - 1];
+
                           return (
-                            <div
-                              key={msg.id}
+                            <button
+                              key={uId}
+                              onClick={() => setSelectedChatUserId(uId)}
                               style={{
-                                alignSelf: isUser ? 'flex-end' : 'flex-start',
-                                maxWidth: '75%',
-                                backgroundColor: isUser ? '#2563eb' : 'rgba(30, 41, 59, 0.9)',
-                                color: '#fff',
-                                padding: '12px 16px',
-                                borderRadius: isUser ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                                border: isUser ? 'none' : '1px solid rgba(255,255,255,0.1)'
+                                padding: '12px',
+                                backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'rgba(15, 23, 42, 0.6)',
+                                border: isSelected ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.06)',
+                                borderRadius: '10px',
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px'
                               }}
                             >
-                              <div style={{ fontSize: '11px', opacity: 0.8, marginBottom: '4px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                {!isUser ? <Shield size={12} color="#f87171" /> : null} {msg.senderName} ({msg.timestamp})
+                              <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700', color: '#fff' }}>
+                                {u.name ? u.name.charAt(0).toUpperCase() : 'U'}
                               </div>
-                              <div style={{ fontSize: '13px', lineHeight: '1.5' }}>
-                                {msg.text}
+                              <div style={{ flex: 1, overflow: 'hidden' }}>
+                                <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>{u.name}</div>
+                                <div style={{ fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {lastMsg ? `${(lastMsg.senderId?._id || lastMsg.senderId)?.toString() === uid ? 'You: ' : ''}${lastMsg.text}` : `${u.homeCountry || 'Traveler'}`}
+                                </div>
                               </div>
-                            </div>
+                            </button>
                           );
                         })
                       )}
                     </div>
 
-                    {/* Chat Input */}
-                    <form onSubmit={handleSendChatMessage} style={{ padding: '14px 18px', backgroundColor: '#1e293b', borderTop: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', gap: '10px' }}>
-                      <input
-                        type="text"
-                        placeholder="Ask Admin for trip guidance, approval help, or safety tips..."
-                        value={chatInputText}
-                        onChange={(e) => setChatInputText(e.target.value)}
-                        style={{ flex: 1, padding: '10px 14px', backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff', fontSize: '13px' }}
-                      />
-                      <button
-                        type="submit"
-                        className="btn-primary"
-                        style={{ padding: '10px 20px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        <Send size={15} /> Send
-                      </button>
-                    </form>
+                    {/* Chat Messages Panel */}
+                    <div className="travel-card" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                      
+                      {/* Thread Header */}
+                      <div style={{ padding: '16px 20px', backgroundColor: 'rgba(15, 23, 42, 0.8)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '40px', height: '40px', borderRadius: '12px',
+                          backgroundColor: (selectedChatUserId === 'admin' || !selectedChatUserId) ? '#ef4444' : '#3b82f6',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '15px', fontWeight: '700'
+                        }}>
+                          {(selectedChatUserId === 'admin' || !selectedChatUserId) ? <Shield size={20} /> : (activeContact?.name ? activeContact.name.charAt(0).toUpperCase() : 'U')}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '15px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {activeContact?.name || 'Chat Conversation'} {(selectedChatUserId === 'admin' || !selectedChatUserId) && <CheckCircle2 size={16} color="#10b981" />}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#38bdf8' }}>
+                            {(selectedChatUserId === 'admin' || !selectedChatUserId) ? 'Official Admin Support • Guiding travel safety & verification' : `Traveler • ${activeContact?.style || 'Direct Message'}`}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Messages Container */}
+                      <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: '#0f172a' }}>
+                        {currentThreadMessages.length === 0 ? (
+                          <div style={{ margin: 'auto', textAlign: 'center', color: '#64748b', fontSize: '13px', maxWidth: '400px' }}>
+                            <MessageSquare size={36} color="#3b82f6" style={{ margin: '0 auto 12px' }} />
+                            <h4 style={{ color: '#fff', fontSize: '15px', fontWeight: '700', marginBottom: '4px' }}>
+                              {(selectedChatUserId === 'admin' || !selectedChatUserId) ? 'Welcome to Admin Support!' : `Chat with ${activeContact?.name}`}
+                            </h4>
+                            <p style={{ color: '#94a3b8' }}>
+                              {(selectedChatUserId === 'admin' || !selectedChatUserId)
+                                ? 'Send a message to the Admin for trip guidance, questions, or verification.'
+                                : 'Say hello and start planning your next travel adventure together!'}
+                            </p>
+                          </div>
+                        ) : (
+                          currentThreadMessages.map((msg, index) => {
+                            const isMe = (msg.senderId?._id || msg.senderId)?.toString() === uid;
+                            return (
+                              <div
+                                key={msg._id || msg.id || index}
+                                style={{
+                                  alignSelf: isMe ? 'flex-end' : 'flex-start',
+                                  maxWidth: '75%',
+                                  backgroundColor: isMe ? '#2563eb' : 'rgba(30, 41, 59, 0.9)',
+                                  color: '#fff',
+                                  padding: '12px 16px',
+                                  borderRadius: isMe ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                                  border: isMe ? 'none' : '1px solid rgba(255,255,255,0.1)'
+                                }}
+                              >
+                                <div style={{ fontSize: '11px', opacity: 0.8, marginBottom: '4px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  {msg.senderRole === 'admin' ? <Shield size={12} color="#f87171" /> : null} {msg.senderName} ({msg.timestamp || 'Just now'})
+                                </div>
+                                <div style={{ fontSize: '13px', lineHeight: '1.5' }}>
+                                  {msg.text}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      {/* Chat Input */}
+                      <form onSubmit={handleSendChatMessage} style={{ padding: '14px 18px', backgroundColor: '#1e293b', borderTop: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', gap: '10px' }}>
+                        <input
+                          type="text"
+                          placeholder={(selectedChatUserId === 'admin' || !selectedChatUserId) ? "Message Admin for guidance or support..." : `Message ${activeContact?.name || 'traveler'}...`}
+                          value={chatInputText}
+                          onChange={(e) => setChatInputText(e.target.value)}
+                          style={{ flex: 1, padding: '10px 14px', backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff', fontSize: '13px' }}
+                        />
+                        <button
+                          type="submit"
+                          className="btn-primary"
+                          style={{ padding: '10px 20px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                          <Send size={15} /> Send
+                        </button>
+                      </form>
+
+                    </div>
 
                   </div>
                 </div>
@@ -1848,24 +2001,49 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+                      <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }}>
                         <button
                           onClick={() => setCurrentMatchIndex(currentMatchIndex + 1)}
                           className="btn-secondary"
-                          style={{ padding: '10px 24px', fontSize: '13px', cursor: 'pointer' }}
+                          style={{ padding: '10px 18px', fontSize: '13px', cursor: 'pointer' }}
                         >
                           Next Profile
                         </button>
 
                         <button
                           onClick={() => {
-                            triggerToast(`💖 Match request sent to ${activeCandidate.name}!`);
-                            setCurrentMatchIndex(currentMatchIndex + 1);
+                            const candId = (activeCandidate._id || activeCandidate.id)?.toString();
+                            setSelectedChatUserId(candId);
+                            setUserTab('chat');
+                          }}
+                          style={{
+                            padding: '10px 18px',
+                            backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                            border: '1px solid #3b82f6',
+                            color: '#60a5fa',
+                            borderRadius: '10px',
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <MessageCircle size={15} /> Chat with {activeCandidate.name.split(' ')[0]}
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            triggerToast(`💖 Connected with ${activeCandidate.name}!`);
+                            const candId = (activeCandidate._id || activeCandidate.id)?.toString();
+                            setSelectedChatUserId(candId);
+                            setUserTab('chat');
                           }}
                           className="btn-primary"
-                          style={{ padding: '12px 28px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                          style={{ padding: '10px 20px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                         >
-                          <Heart size={16} fill="#fff" /> Connect as Buddy
+                          <Heart size={15} fill="#fff" /> Connect
                         </button>
                       </div>
                     </div>
