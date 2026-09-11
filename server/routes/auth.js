@@ -58,12 +58,17 @@ router.post('/login', async (req, res) => {
 
     const query = emailOrUsername.trim().toLowerCase();
 
-    // Support login with 'admin' shorthand
+    // Support login with 'admin' shorthand, email address, or name/username
     let user;
     if (query === 'admin') {
       user = await User.findOne({ role: 'admin' }).select('+password');
     } else {
-      user = await User.findOne({ email: query }).select('+password');
+      user = await User.findOne({
+        $or: [
+          { email: query },
+          { name: { $regex: `^${query}$`, $options: 'i' } }
+        ]
+      }).select('+password');
     }
 
     if (!user || !(await user.comparePassword(password))) {
